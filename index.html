@@ -186,7 +186,7 @@
                     <h2 class="text-lg font-bold text-gray-700 mb-4">Attachments</h2>
                     
                     <div id="attachments-container" class="space-y-4">
-                        <!-- Shipper Documents Section -->
+                        <!-- Shipper Documents Section (Static/Non-Editable for Carrier) -->
                         <div>
                             <p class="text-base font-semibold text-gray-700 mb-2">Shipper Documents:</p>
                             <div class="flex items-center justify-between text-sm p-2 rounded-lg bg-white">
@@ -206,13 +206,13 @@
                             </div>
                         </div>
 
-                        <!-- Carrier Documents Section -->
+                        <!-- Carrier Documents Section (Editable) -->
                         <div>
                             <p class="text-base font-semibold text-gray-700 mb-2 mt-4">Carrier Documents:</p>
                             
                             <!-- Documents will be rendered here by JavaScript -->
                             <div id="carrier-documents-list" class="space-y-2">
-                                <!-- Document list is rendered via JavaScript -->
+                                <!-- Dynamic content inserted by renderCarrierDocuments() -->
                             </div>
                             <!-- END carrier-documents-list -->
 
@@ -247,7 +247,7 @@
             </div>
         </div>
 
-        <!-- UNSAVED CHANGES ACTION PANEL (MOVED TO BOTTOM) -->
+        <!-- UNSAVED CHANGES ACTION PANEL (NOW AT THE BOTTOM) -->
         <div id="unsaved-changes-banner" class="mt-6 flex flex-col md:flex-row justify-between items-center bg-indigo-100 p-4 rounded-xl shadow-lg border border-indigo-300 transition duration-300 hidden">
             <p class="text-base font-semibold text-indigo-800 mb-3 md:mb-0 flex items-center">
                 <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 mr-2 text-red-500"><path d="M18 6L6 18"/><path d="M6 6L18 18"/></svg>
@@ -347,12 +347,20 @@
         }
 
         function checkModificationStatus() {
-            const isLinkChanged = document.getElementById('tracking-link').value !== initialShipmentData.trackingLink;
+            const currentLink = document.getElementById('tracking-link').value;
+            const isLinkChanged = currentLink !== initialShipmentData.trackingLink;
             
             // Check if document lists are different (length or content)
             const initialDocNames = initialShipmentData.carrierDocuments.map(doc => doc.name).sort().join('|');
             const currentDocNames = currentShipmentData.carrierDocuments.map(doc => doc.name).sort().join('|');
             const isDocsChanged = initialDocNames !== currentDocNames;
+
+            // Log status to help the user diagnose in the console
+            console.log(`--- Modification Check ---`);
+            console.log(`Link: '${currentLink}' vs Initial: '${initialShipmentData.trackingLink}' -> Changed: ${isLinkChanged}`);
+            console.log(`Docs Changed: ${isDocsChanged}`);
+            console.log(`Showing Update Buttons: ${isLinkChanged || isDocsChanged}`);
+            console.log(`--------------------------`);
 
             toggleSaveButtons(isLinkChanged || isDocsChanged);
         }
@@ -372,7 +380,7 @@
             toggleSaveButtons(false);
             showMessage('Shipment details and documents UPDATED successfully (simulated).');
 
-            // Optional: Re-render documents to show new ones as 'saved' (if needed)
+            // 3. Re-render documents to clear the 'NEW' tag on newly saved documents
             renderCarrierDocuments(); 
         }
 
@@ -402,6 +410,11 @@
         function renderCarrierDocuments() {
             const listContainer = document.getElementById('carrier-documents-list');
             listContainer.innerHTML = ''; // Clear existing documents
+
+            if (currentShipmentData.carrierDocuments.length === 0) {
+                 listContainer.innerHTML = '<p class="text-sm text-gray-500 italic p-2">No carrier documents uploaded yet.</p>';
+                 return;
+            }
 
             currentShipmentData.carrierDocuments.forEach(doc => {
                 const docElement = document.createElement('div');
@@ -591,7 +604,8 @@
 
         // Initial render to show default carrier documents
         window.onload = function() {
-            renderCarrierDocuments();
+            // This ensures the current documents are rendered from the JS state
+            renderCarrierDocuments(); 
         };
     </script>
 
