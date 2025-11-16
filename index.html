@@ -285,7 +285,7 @@
                 </button>
                 <button 
                     class="flex-1 md:flex-none px-4 py-2 text-sm font-semibold text-white bg-green-500 rounded-full hover:bg-green-600 transition shadow-lg" 
-                    onclick="showModal('Mark as Delivered', 'Confirming delivery will close this load and initiate payment processing. Are you sure?', 'delivered')"
+                    onclick="showModal('Mark as Delivered', 'Confirming delivery will finalize this shipment. Are you sure?', 'delivered')"
                 >
                     Mark as Delivered
                 </button>
@@ -329,7 +329,8 @@
         const initialShipmentData = {
             trackingLink: document.getElementById('tracking-link').value,
             carrierDocuments: [
-                { id: 'doc-L4839', name: 'loading_invoice_L4839.pdf', url: '#', isNew: false }
+                // Existing document (isNew: false)
+                { id: 'doc-L4839', name: 'loading_invoice_L4839.pdf', url: '#', isNew: false } 
             ]
         };
         let currentShipmentData = JSON.parse(JSON.stringify(initialShipmentData)); // Deep copy for mutable state
@@ -374,13 +375,18 @@
         function saveChanges() {
             // 1. Update initial/saved state to current state
             initialShipmentData.trackingLink = document.getElementById('tracking-link').value;
-            initialShipmentData.carrierDocuments = JSON.parse(JSON.stringify(currentShipmentData.carrierDocuments)); // Deep copy
+            // When saving, clear the 'isNew' flag for all current documents and update the initial state
+            initialShipmentData.carrierDocuments = currentShipmentData.carrierDocuments.map(doc => ({
+                ...doc,
+                isNew: false // Mark all as saved
+            }));
+            currentShipmentData = JSON.parse(JSON.stringify(initialShipmentData));
 
             // 2. Hide the banner and update UI
             toggleSaveButtons(false);
             showMessage('Shipment details and documents UPDATED successfully (simulated).');
 
-            // 3. Re-render documents to clear the 'NEW' tag on newly saved documents
+            // 3. Re-render documents to show the updated state
             renderCarrierDocuments(); 
         }
 
@@ -421,20 +427,24 @@
                 docElement.id = doc.id;
                 docElement.className = 'flex items-center justify-between text-sm p-2 rounded-lg bg-white border border-gray-100';
                 
+                // Determine if the download button should be present (only show if NOT a new/unsaved document)
+                const downloadButton = doc.isNew ? '' : `
+                    <button class="flex items-center px-3 py-1 text-xs text-white bg-gray-600 rounded-full hover:bg-gray-700 transition duration-150 shadow-sm font-semibold" onclick="showMessage('Downloading document: ${doc.name}')">
+                        Download
+                    </button>
+                `;
+
                 // Content HTML
                 docElement.innerHTML = `
                     <div class="flex items-center space-x-2 w-2/3 truncate">
                         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-gray-500 flex-shrink-0"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
                         <span class="truncate font-medium text-gray-700">${doc.name}</span>
-                        ${doc.isNew ? '<span class="text-xs font-bold text-indigo-500 bg-indigo-100 px-2 py-0.5 rounded-full ml-2">NEW</span>' : ''}
                     </div>
                     <div class="flex space-x-2 flex-shrink-0">
-                        <button class="px-3 py-1 text-xs text-blue-600 border border-blue-200 bg-white rounded-full hover:bg-blue-500 transition duration-150 font-semibold" onclick="showMessage('Viewing document: ${doc.name}')">
+                        <button class="px-3 py-1 text-xs text-blue-600 border border-blue-200 bg-white rounded-full hover:bg-blue-50 transition duration-150 font-semibold" onclick="showMessage('Viewing document: ${doc.name}')">
                             View
                         </button>
-                        <button class="flex items-center px-3 py-1 text-xs text-white bg-gray-600 rounded-full hover:bg-gray-700 transition duration-150 shadow-sm font-semibold" onclick="showMessage('Downloading document: ${doc.name}')">
-                            Download
-                        </button>
+                        ${downloadButton}
                         <button class="flex items-center px-3 py-1 text-xs text-white bg-red-500 rounded-full hover:bg-red-600 transition duration-150 shadow-sm font-semibold" onclick="removeDocument('${doc.name}', '${doc.id}')">
                             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3 h-3 mr-1"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
                             Remove
@@ -493,7 +503,7 @@
                     id: 'new-' + Date.now() + '-' + i,
                     name: file.name,
                     url: '#',
-                    isNew: true // Flag to show it's a new unsaved document
+                    isNew: true // Flag remains internally for logic, but is not displayed
                 });
                 uploadedCount++;
             }
@@ -530,7 +540,7 @@
 
             // Set button style and text based on action
             if (actionType === 'cancel') {
-                confirmButton.innerText = 'Yes, Cancel Load';
+                confirmButton.innerText = 'Confirm Cancellation'; // Changed text here
                 confirmButton.classList.remove('bg-green-500', 'hover:bg-green-600');
                 confirmButton.classList.add('bg-red-500', 'hover:bg-red-600');
             } else if (actionType === 'delivered') {
