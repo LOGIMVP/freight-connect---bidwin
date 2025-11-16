@@ -1,644 +1,406 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Detailed Shipment Information</title>
-    <!-- Load Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    <style>
-        /* Custom styles for readability and spacing */
-        body {
-            font-family: 'Inter', sans-serif;
-            background-color: #f7f9fb;
-        }
-        .info-card {
-            background-color: white;
-            border-radius: 8px;
-            box-shadow: 0 1px 3px 0 rgba(0, 0, 0, 0.1), 0 1px 2px 0 rgba(0, 0, 0, 0.06);
-            border: 1px solid #e5e7eb;
-        }
-        .section-header {
-            color: #1f2937;
-            font-weight: 700;
-            margin-bottom: 12px;
-            font-size: 1.125rem;
-        }
-        .detail-item {
-            padding: 4px 0;
-        }
-        /* Styling for the Confirmed/Awarded Banner */
-        .confirmed-box {
-            background-color: #d1fae5; /* green-100 */
-            border-top: 2px solid #34d399;
-            border-bottom: 2px solid #34d399;
-        }
-        /* Styling for the unsaved changes banner */
-        .unsaved-box {
-            background-color: #fefcbf; /* yellow-100 */
-            border-top: 2px solid #facc15;
-            border-bottom: 2px solid #facc15;
-        }
-        /* Specific styling for the 2-column specs layout */
-        .spec-grid {
-            display: grid;
-            grid-template-columns: 1fr 1fr;
-            grid-template-rows: repeat(4, auto);
-            gap: 0.75rem; 
-            align-items: center;
-        }
-        
-        /* --- FIX FOR SKID DETAILS ALIGNMENT --- */
-        /* Target the second column (Dimensions) of the Skid Details table to ensure center alignment */
-        .skid-details-table th:nth-child(2),
-        .skid-details-table td:nth-child(2) {
-            text-align: center;
-        }
-    </style>
-    <script>
-        tailwind.config = {
-            theme: {
-                extend: {
-                    colors: {
-                        'primary-blue': '#3b82f6',
-                        'primary-green': '#34d399',
-                        'primary-red': '#ef4444',
-                        'accent-yellow': '#fef3c7', /* yellow-100 for notes */
-                        'text-blue': '#3b82f6',
-                        'text-red': '#ef4444',
-                        'update-purple': '#5c63ec', /* Custom purple for "Update Changes" button */
-                    }
-                }
-            }
-        }
+import { useState, useCallback, useMemo } from 'react';
+import { Truck, MapPin, Calendar, Scale, Ruler, FileText, Upload, Trash2, Save, X } from 'lucide-react';
 
-        // Mock Data for a confirmed shipment
-        const MOCK_SHIPMENT = {
-            loadId: "L-4839",
-            trackingLink: "https://cloud.samsara.com/load-details/L-4839", 
-            pickup: {
-                location: "123 Oilfield Way, Edmonton, AB, T5J 0K6",
-                contact: "Edmonton Supply",
-                phone: "780-555-0500",
-                stops: 1,
-            },
-            delivery: {
-                location: "789 Central Goods Rd, Winnipeg, MB, R3C 0B4",
-                contact: "Central Logistics",
-                email: "wpg.logistics@example.com",
-                phone: "204-555-0700",
-                stops: 1,
-            },
-            specs: {
-                equipment: "LTL",
-                equipmentDetail: "(Dry Van)",
-                totalWeight: "9,000 lbs",
-                totalSkidQuantity: 9,
-                estLinearFeet: "12.5 ft",
-            },
-            scheduling: {
-                pickupDeadline: "Nov 18, 2025",
-                dropOffDeadline: "Nov 21, 2025",
-            },
-            skids: [
-                { quantity: 9, dimensions: "40 x 40 x 40", weight: 1000 }
-            ],
-            documents: [
-                { name: "pickup_ref_54321.pdf", viewUrl: "#view", downloadUrl: "#download" }
-            ],
-            carrierDocuments: [], // New array to track documents added by carrier
-            awardedRate: 1100.00,
-            notes: "Pickup by appointment only.",
+// Mock Data Interfaces (Should ideally be imported from types.ts)
+interface Document {
+  id: string;
+  name: string;
+  url: string;
+  type: 'shipper' | 'carrier';
+}
+
+interface Shipment {
+  loadId: string;
+trackingLink: string;
+  pickup: { location: string; contact: string; phone: string; stops: number };
+  delivery: { location: string; contact: string; email: string; phone: string; stops: number };
+  specs: { equipment: string; equipmentDetail: string; totalWeight: string; totalSkidQuantity: number; estLinearFeet: string };
+  scheduling: { pickupDeadline: string; dropOffDeadline: string };
+  skids: { quantity: number; dimensions: string; weight: number }[];
+  shipperDocuments: Document[];
+  awardedRate: number;
+  notes: string;
+}
+
+// Mock initial data (for demonstration)
+const MOCK_SHIPMENT: Shipment = {
+  loadId: "L-4839",
+  trackingLink: "https://cloud.samsara.com/load-details/L-4839", 
+  pickup: { location: "123 Oilfield Way, Edmonton, AB", contact: "Edmonton Supply", phone: "780-555-0500", stops: 1 },
+  delivery: { location: "789 Central Goods Rd, Winnipeg, MB", contact: "Central Logistics", email: "wpg.logistics@example.com", phone: "204-555-0700", stops: 1 },
+  specs: { equipment: "LTL", equipmentDetail: "(Dry Van)", totalWeight: "9,000 lbs", totalSkidQuantity: 9, estLinearFeet: "12.5 ft" },
+  scheduling: { pickupDeadline: "Nov 18, 2025", dropOffDeadline: "Nov 21, 2025" },
+  skids: [{ quantity: 9, dimensions: "40 x 40 x 40", weight: 1000 }],
+  shipperDocuments: [
+    { id: 'S-1', name: "Bill_of_Lading_123.pdf", url: "#", type: 'shipper' },
+    { id: 'S-2', name: "Pickup_Ref_54321.pdf", url: "#", type: 'shipper' },
+  ],
+  awardedRate: 1100.00,
+  notes: "Pickup by appointment only. Driver must check in 30 mins prior to arrival.",
+};
+
+// --- Component Helper: DocumentRow ---
+const DocumentRow: React.FC<{ doc: Document; onRemove?: (id: string) => void }> = ({ doc, onRemove }) => (
+  <div className="flex items-center justify-between text-sm ml-7 p-2 bg-gray-50 rounded-lg">
+    <div className="flex items-center space-x-2 w-2/3 truncate">
+        <FileText className="w-4 h-4 text-primary-blue flex-shrink-0" />
+        <span className="truncate pr-2 font-medium text-gray-700">{doc.name}</span>
+    </div>
+    <div className="flex space-x-2">
+        {/* View Button */}
+        <a href={doc.url} target="_blank" rel="noopener noreferrer" className="px-3 py-1 text-xs text-primary-blue border border-primary-blue rounded-full hover:bg-blue-50 transition duration-150">
+            View
+        </a>
+        
+        {/* Remove Button (Only for Carrier Documents) */}
+        {doc.type === 'carrier' && onRemove && (
+            <button
+                className="flex items-center px-3 py-1 text-xs text-white bg-primary-red rounded-full hover:bg-red-600 transition duration-150 shadow-sm"
+                onClick={() => onRemove(doc.id)}
+            >
+                <Trash2 className="w-3 h-3 mr-1" />
+                Remove
+            </button>
+        )}
+    </div>
+  </div>
+);
+
+
+// --- Main Component ---
+const CarrierDetailView: React.FC = () => {
+  const [trackingLink, setTrackingLink] = useState(MOCK_SHIPMENT.trackingLink);
+  // Separate state for documents the carrier has added (or modified/removed locally)
+  const [carrierDocuments, setCarrierDocuments] = useState<Document[]>([]);
+  // Store the initial tracking link value to check for changes
+  const initialTrackingLink = MOCK_SHIPMENT.trackingLink;
+  
+  // Custom message state for toast notifications
+  const [message, setMessage] = useState<{ text: string; color: string } | null>(null);
+
+  // Function to show a temporary message (Toast)
+  const showMessage = useCallback((text: string, color: string) => {
+    setMessage({ text, color });
+    setTimeout(() => setMessage(null), 5000); // Clear after 5 seconds
+  }, []);
+
+  // Use useMemo to check if there are any pending changes
+  const hasUnsavedChanges = useMemo(() => {
+    const linkChanged = trackingLink !== initialTrackingLink;
+    const documentsAddedOrRemoved = carrierDocuments.length > 0; // Simple check for pending docs
+    // In a real app, you'd check for new, deleted, and modified docs against a "saved" list
+    return linkChanged || documentsAddedOrRemoved;
+  }, [trackingLink, initialTrackingLink, carrierDocuments.length]);
+
+  // --- HANDLERS ---
+
+  const handleTrackingLinkChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    setTrackingLink(e.target.value);
+  }, []);
+
+  const handleFileUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 10 * 1024 * 1024) {
+        showMessage(`File size exceeds 10MB limit: ${file.name}`, "bg-primary-red");
+        return;
+      }
+
+      showMessage(`Uploading file: ${file.name} (simulated)...`, "bg-primary-blue");
+
+      // Simulate a successful upload after a short delay
+      setTimeout(() => {
+        const newDoc: Document = {
+          id: `carrier-doc-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          name: file.name,
+          url: '#', // Placeholder URL
+          type: 'carrier',
         };
         
-        // Global state variable to track unsaved changes
-        let hasUnsavedChanges = false;
+        // --- KEY FIX: Update the state with the new document ---
+        setCarrierDocuments(prevDocs => [...prevDocs, newDoc]);
         
-        // Variable to hold the action when the modal is open
-        let currentAction = null;
+        // Clear the file input for re-uploading the same file
+        e.target.value = ''; 
         
-        // Keep track of the initial/last saved value of the tracking link
-        let initialTrackingLink = MOCK_SHIPMENT.trackingLink; 
+        showMessage(`Document added. Click 'Update Changes' to save.`, "bg-accent-yellow text-gray-800");
 
+      }, 1500);
+    }
+  }, [showMessage]);
 
-        document.addEventListener('DOMContentLoaded', () => {
-            renderShipmentDetails(MOCK_SHIPMENT);
-            updateUnsavedBanner(); // Initialize the banner state
-        });
+  // --- ATTACHMENT REMOVAL FIX IS HERE ---
+  const handleRemoveAttachment = useCallback((docId: string) => {
+    // This is the CRITICAL STEP: Filter the documents list and update the state.
+    setCarrierDocuments(prevDocs => {
+        const updatedDocs = prevDocs.filter(doc => doc.id !== docId);
+        return updatedDocs;
+    });
 
-        // --- STATE MANAGEMENT ---
+    showMessage(`Document removed locally. Click 'Update Changes' to finalize.`, "bg-accent-yellow text-gray-800");
+  }, [showMessage]);
+  // --- END OF ATTACHMENT REMOVAL FIX ---
+
+  const handleSaveChanges = useCallback(() => {
+    // 1. Send trackingLink update to the API
+    // 2. Send carrierDocuments list (additions/deletions) to the API
+    
+    showMessage("Saving all updates to tracking link and documents...", "bg-update-purple");
+
+    // Simulate save success
+    setTimeout(() => {
+        // In a real app, the server would return the new list of saved documents.
+        // For this mock, we assume success and clear the temporary state:
+        // A complete save would involve integrating these documents into the main shipment state
+        // and resetting the trackingLink state back to the 'initial' value.
+        // For simplicity, we just show a success message:
         
-        // Function to check if there are any changes (tracking link OR documents)
-        function checkIfDirty() {
-            const trackingLinkInput = document.getElementById('tracking-link');
-            // Safely check if the input exists before accessing its value
-            const currentTrackingLink = trackingLinkInput ? trackingLinkInput.value : MOCK_SHIPMENT.trackingLink;
-            const trackingLinkChanged = currentTrackingLink !== initialTrackingLink;
-            const pendingDocuments = MOCK_SHIPMENT.carrierDocuments.length > 0;
-            return trackingLinkChanged || pendingDocuments;
-        }
+        // This is where you would update MOCK_SHIPMENT.trackingLink = trackingLink
+        // And MOCK_SHIPMENT.carrierDocuments = savedDocuments
 
-        function markDirty() {
-            if (!hasUnsavedChanges) {
-                hasUnsavedChanges = true;
-                updateUnsavedBanner();
-            }
-        }
-        
-        function markClean() {
-            hasUnsavedChanges = false;
-            updateUnsavedBanner();
-        }
-
-        function saveChanges() {
-            // In a real app, this would execute all API calls to save the tracking link and document list
-            showMessage("Saving all updates to tracking link and documents...", "bg-update-purple");
-            
-            // Simulate API latency
-            setTimeout(() => {
-                const trackingLinkInput = document.getElementById('tracking-link');
-                // Update the "initial" state to reflect the saved state
-                initialTrackingLink = trackingLinkInput ? trackingLinkInput.value : MOCK_SHIPMENT.trackingLink;
-                MOCK_SHIPMENT.trackingLink = initialTrackingLink;
-                
-                // Documents in MOCK_SHIPMENT.carrierDocuments are now considered saved/permanent
-                // In a real app, you might clear a temp flag here or persist them.
-
-                // Mark clean and update banner
-                markClean();
-                showMessage("Shipment details updated successfully.", "bg-primary-green");
-            }, 1000);
-        }
-
-        function updateUnsavedBanner() {
-            const container = document.getElementById('unsaved-changes-container');
-            if (container) {
-                container.innerHTML = hasUnsavedChanges ? `
-                    <div class="flex flex-col md:flex-row justify-between items-center unsaved-box p-4 rounded-lg shadow-md mt-6">
-                        <p class="text-lg font-bold text-gray-800 mb-3 md:mb-0 flex items-center">
-                            <svg class="w-6 h-6 mr-2 text-primary-red" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.394 17c-.77 1.333.192 3 1.732 3z"></path></svg>
-                            You have unsaved changes.
-                        </p>
-                        <button class="flex-1 md:flex-none px-6 py-2 text-sm font-semibold text-white bg-update-purple rounded-md hover:bg-indigo-600 transition shadow-lg" onclick="saveChanges()">
-                            Update Changes
-                        </button>
-                    </div>
-                ` : '';
-            }
-        }
-
-        // --- RENDER FUNCTION ---
-
-        function renderShipmentDetails(shipment) {
-            const app = document.getElementById('app');
-            
-            // Generate the shipper document list HTML
-            const shipperDocsHtml = shipment.documents.map(doc => `
-                <div class="flex items-center justify-between text-sm ml-7">
-                    <span class="truncate pr-2 text-gray-600">${doc.name}</span>
-                    <div class="flex space-x-2">
-                        <button class="px-3 py-1 text-xs text-text-blue border border-text-blue rounded-full hover:bg-blue-50 transition" onclick="handleDocumentAction('View', '${doc.name}')">View</button>
-                        <button class="px-3 py-1 text-xs text-white bg-text-blue rounded-full hover:bg-blue-600 transition" onclick="handleDocumentAction('Download', '${doc.name}')">Download</button>
-                    </div>
-                </div>
-            `).join('');
-
-             // Generate the carrier document list HTML
-            // Note: The ID here is doc-${doc.id} which is used by removeCarrierDocument
-            const carrierDocsHtml = shipment.carrierDocuments.map(doc => `
-                <div class="flex items-center justify-between text-sm ml-7 mt-2" id="${doc.id}"> 
-                    <span class="truncate pr-2 text-gray-600">${doc.name}</span>
-                    <div class="flex space-x-2">
-                        <button class="px-3 py-1 text-xs text-text-blue border border-text-blue rounded-full hover:bg-blue-50 transition" onclick="handleDocumentAction('View', '${doc.name}')">View</button>
-                        <button class="px-3 py-1 text-xs text-white bg-primary-red rounded-full hover:bg-red-600 transition" onclick="removeCarrierDocument('${doc.id}', '${doc.name}')">Remove</button>
-                    </div>
-                </div>
-            `).join('');
-
-            app.innerHTML = `
-                <div class="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
-                    
-                    <!-- HEADER ROW: TITLE AND LIVE TRACKING INPUT -->
-                    <div class="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-gray-200 pb-3">
-                        <h1 class="text-2xl font-bold text-gray-800">Detailed Shipment Information</h1>
-                        
-                        <!-- TRACKING LINK INPUT FIELD -->
-                        <div class="flex flex-col md:flex-row items-start md:items-center text-sm mt-2 md:mt-0">
-                            <label for="tracking-link" class="font-semibold text-gray-700 mr-2 whitespace-nowrap">Tracking Link:</label>
-                            <input type="url" id="tracking-link" value="${shipment.trackingLink}" placeholder="Paste your live tracking URL here"
-                                class="w-full md:w-80 p-1 border border-gray-300 rounded-md text-text-blue focus:ring-primary-blue focus:border-primary-blue text-xs truncate"
-                                oninput="handleTrackingLinkChange(this.value)">
-                        </div>
-                    </div>
-
-                    <!-- PICKUP AND DELIVERY STOPS (Top Card Row) -->
-                    <div class="info-card p-6">
-                        <div class="grid md:grid-cols-2 gap-y-6 md:gap-x-12 text-sm">
-                            
-                            <!-- Pickup Stop -->
-                            <div class="relative pb-2 md:pr-6">
-                                <p class="text-lg font-bold text-gray-700 mb-2">Pickup Stops (${shipment.pickup.stops}):</p>
-                                <p class="text-gray-700 font-normal">${shipment.pickup.location}</p>
-                                <p class="text-gray-500">Contact: ${shipment.pickup.contact}</p>
-                                <a href="tel:${shipment.pickup.phone.replace(/-/g, '')}" class="absolute top-0 right-0 text-text-blue hover:underline">${shipment.pickup.phone}</a>
-                                <div class="absolute bottom-0 left-0 right-0 h-px bg-gray-200 md:hidden"></div>
-                            </div>
-
-                            <!-- Delivery Stop -->
-                            <div class="relative pb-2 md:pl-6">
-                                <p class="text-lg font-bold text-gray-700 mb-2">Delivery Stops (${shipment.delivery.stops}):</p>
-                                <p class="text-gray-700 font-normal">${shipment.delivery.location}</p>
-                                <p class="text-gray-500">Contact: ${shipment.delivery.contact}</p>
-                                <p class="text-gray-500">Email: ${shipment.delivery.email}</p>
-                                <a href="tel:${shipment.delivery.phone.replace(/-/g, '')}" class="absolute top-0 right-0 text-text-blue hover:underline">${shipment.delivery.phone}</a>
-                            </div>
-                        </div>
-                    </div>
+        showMessage("Shipment details updated successfully.", "bg-primary-green");
+    }, 1500);
+  }, [trackingLink, carrierDocuments, showMessage]);
 
 
-                    <!-- SPECIFICATIONS, SCHEDULING, SKID DETAILS, ATTACHMENTS (Main 2x2 Grid) -->
-                    <div class="grid lg:grid-cols-2 gap-6">
-
-                        <!-- LEFT COLUMN GROUP -->
-                        <div class="space-y-6">
-                            
-                            <!-- Shipment Specs -->
-                            <div class="info-card p-6">
-                                <h2 class="section-header">Shipment Specifications</h2>
-                                <div class="spec-grid text-sm">
-                                    <p class="font-normal text-gray-500 detail-item">Equipment</p>
-                                    <!-- Changed font size to text-lg for consistency -->
-                                    <p class="text-right font-bold text-gray-800 text-lg detail-item">${shipment.specs.equipment} <span class="font-normal text-gray-500 text-sm">${shipment.specs.equipmentDetail}</span></p>
-
-                                    <p class="font-normal text-gray-500 detail-item">Total Weight</p>
-                                    <!-- Changed font size to text-lg for consistency -->
-                                    <p class="text-right font-bold text-gray-800 text-lg detail-item">${shipment.specs.totalWeight}</p>
-
-                                    <p class="font-normal text-gray-500 detail-item">Total Skid Quantity</p>
-                                    <!-- Standardized font size to text-lg from text-xl -->
-                                    <p class="text-right font-bold text-gray-800 text-lg detail-item">${shipment.specs.totalSkidQuantity}</p>
-
-                                    <p class="font-normal text-gray-500 detail-item">Est. Linear Feet</p>
-                                    <!-- Changed font size to text-lg for consistency -->
-                                    <p class="text-right font-bold text-gray-800 text-lg detail-item">${shipment.specs.estLinearFeet}</p>
-                                </div>
-                            </div>
-                            
-                            <!-- Skid Details -->
-                            <div class="info-card p-6">
-                                <h2 class="section-header">Skid Details</h2>
-                                <!-- Added skid-details-table class for custom CSS targeting -->
-                                <table class="w-full text-sm text-gray-700 skid-details-table">
-                                    <thead class="text-xs text-gray-600 uppercase bg-gray-50">
-                                        <tr>
-                                            <!-- Aligned Quantity header to left -->
-                                            <th scope="col" class="py-3 pl-3 text-left">Quantity</th>
-                                            <!-- Centered Dimensions header (CSS will enforce center) -->
-                                            <th scope="col" class="py-3 text-center">Dimensions (L×W×H IN)</th>
-                                            <!-- Aligned Weight header to right -->
-                                            <th scope="col" class="py-3 pr-3 text-right">Weight Per Skid (LBS)</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        ${shipment.skids.map(skid => `
-                                            <tr class="bg-white border-b last:border-b-0">
-                                                <!-- Left alignment -->
-                                                <td class="py-4 pl-3 font-semibold text-gray-800 text-left">${skid.quantity}</td>
-                                                <!-- Center alignment (CSS will enforce center) -->
-                                                <td class="py-4 font-semibold text-gray-800 text-center">${skid.dimensions}</td>
-                                                <!-- Right alignment -->
-                                                <td class="py-4 pr-3 font-semibold text-gray-800 text-right">${skid.weight.toLocaleString()}</td>
-                                            </tr>
-                                        `).join('')}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-
-                        <!-- RIGHT COLUMN GROUP -->
-                        <div class="space-y-6">
-                            
-                            <!-- Scheduling -->
-                            <div class="info-card p-6">
-                                <h2 class="section-header">Scheduling</h2>
-                                <div class="space-y-4 text-sm">
-                                    <div class="flex justify-between items-center">
-                                        <p class="font-normal text-gray-500 detail-item">Pickup Deadline</p>
-                                        <p class="text-text-red font-bold text-lg detail-item">${shipment.scheduling.pickupDeadline}</p>
-                                    </div>
-                                    <div class="flex justify-between items-center">
-                                        <p class="font-normal text-gray-500 detail-item">Drop Off Deadline</p>
-                                        <p class="text-text-red font-bold text-lg detail-item">${shipment.scheduling.dropOffDeadline}</p>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- Attachments -->
-                            <div class="info-card p-6">
-                                <h2 class="section-header">Attachments</h2>
-                                <div class="space-y-4">
-                                    <p class="font-normal text-gray-700 flex items-center">
-                                        <svg class="w-5 h-5 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.414a1 1 0 00-1.414-1.414L10 11.586"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414l-1.414 1.414"></path></svg>
-                                        Shipper Documents:
-                                    </p>
-                                    ${shipperDocsHtml}
-
-                                    <p class="font-normal text-gray-700 mt-4 flex items-center">
-                                        <svg class="w-5 h-5 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0l-4 4m4-4v12"></path></svg>
-                                        Carrier Documents:
-                                    </p>
-                                    
-                                    <!-- Container for dynamically added documents -->
-                                    <div id="carrier-document-list" class="space-y-2">
-                                        ${carrierDocsHtml}
-                                    </div>
-
-                                    <!-- Hidden File Input (Triggered by click on drop-zone) -->
-                                    <input type="file" id="carrier-file-upload" class="hidden" onchange="handleFileSelect(event)">
-                                    
-                                    <!-- Drop Zone / Click Target -->
-                                    <div id="drop-zone" 
-                                        class="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:bg-gray-50 transition mt-4"
-                                        onclick="document.getElementById('carrier-file-upload').click()"
-                                        ondragover="handleDragOver(event)"
-                                        ondragleave="handleDragLeave(event)"
-                                        ondrop="handleDrop(event)">
-                                        <p class="text-sm text-text-blue font-semibold">Click to upload or drag and drop (Max 10MB)</p>
-                                    </div>
-
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-
-                    <!-- SPECIAL NOTES (Full Width) -->
-                    <div class="p-6 rounded-lg bg-accent-yellow border border-yellow-300">
-                        <h2 class="section-header text-gray-800">Special Notes</h2>
-                        <p class="text-sm text-gray-700">${shipment.notes}</p>
-                    </div>
-
-                    
-                    <!-- UNSAVED CHANGES BANNER CONTAINER (New Feature) -->
-                    <div id="unsaved-changes-container">
-                        <!-- Banner content is inserted here by JavaScript when changes occur -->
-                    </div>
-
-                    <!-- CONFIRMED BANNER / ACTIONS (Full Width) -->
-                    <div class="flex flex-col md:flex-row justify-between items-center confirmed-box p-4 rounded-lg shadow-md mt-6">
-                        <p class="text-lg font-bold text-primary-green mb-3 md:mb-0">
-                            You won this bid! Rate: <span class="text-2xl">$${shipment.awardedRate.toLocaleString()}</span>
-                        </p>
-                        <div class="flex space-x-3 w-full md:w-auto justify-end">
-                            <button class="flex-1 md:flex-none px-4 py-2 text-sm font-semibold text-text-red border border-text-red bg-white rounded-md hover:bg-red-50 transition" onclick="handleAction('Cancel Shipment')">
-                                Cancel Shipment
-                            </button>
-                            <button class="flex-1 md:flex-none px-4 py-2 text-sm font-semibold text-white bg-primary-green rounded-md hover:bg-green-600 transition" onclick="handleAction('Mark as Delivered')">
-                                Mark as Delivered
-                            </button>
-                        </div>
-                    </div>
-
-
-                    <!-- Message Box for Alerts (Toasts) -->
-                    <div id="message-box" class="fixed bottom-4 right-4 z-50"></div>
-
-                </div>
-
-                <!-- MODAL STRUCTURE (Hidden by default) -->
-                <div id="confirmation-modal" class="fixed inset-0 bg-gray-600 bg-opacity-75 z-50 hidden flex items-center justify-center">
-                    <div class="bg-white p-6 rounded-lg shadow-2xl w-full max-w-sm m-4">
-                        <h3 id="modal-title" class="text-xl font-bold text-gray-800 mb-4">Confirm Action</h3>
-                        <p id="modal-message" class="text-gray-700 mb-6 leading-relaxed"></p>
-                        <div class="flex justify-end space-x-3">
-                            <button onclick="closeModal()" class="px-4 py-2 text-sm font-semibold text-gray-600 bg-gray-100 rounded-md hover:bg-gray-200 transition">
-                                Nevermind
-                            </button>
-                            <button id="modal-confirm-btn" class="px-4 py-2 text-sm font-semibold text-white rounded-md transition" onclick="confirmAction()">
-                                Confirm
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            `;
-        }
-
-        // --- TRACKING LINK HANDLING ---
-        function handleTrackingLinkChange(link) {
-            // Update the mock object value immediately for reference
-            MOCK_SHIPMENT.trackingLink = link;
-
-            // Check if ANY changes (link or documents) exist and update the banner state
-            if (checkIfDirty()) {
-                markDirty();
-            } else {
-                 markClean();
-            }
-        }
-
-
-        // --- FILE UPLOAD / DRAG AND DROP LOGIC ---
-
-        function handleFileSelect(event) {
-            const files = event.target.files;
-            if (files.length > 0) {
-                uploadFile(files[0]);
-            }
-        }
-
-        function generateUniqueId() {
-            // Simple unique ID for mock tracking
-            // Using a prefix to distinguish from other potential IDs, and ensure it's unique
-            return 'carrier-doc-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
-        }
-
-        function uploadFile(file) {
-            if (file) {
-                if (file.size > 10 * 1024 * 1024) {
-                    showMessage(`File size exceeds 10MB limit: ${file.name}`, "bg-primary-red");
-                    return;
-                }
-
-                // Simulate upload delay
-                showMessage(`Uploading file: ${file.name} (simulated)...`, "bg-primary-blue");
-
-                // Simulate a successful upload after a short delay
-                setTimeout(() => {
-                    const docId = generateUniqueId();
-                    const newDoc = { id: docId, name: file.name, temp: true };
-                    
-                    // Add to mock data (will be saved when 'Update Changes' is clicked)
-                    MOCK_SHIPMENT.carrierDocuments.push(newDoc);
-
-                    const documentList = document.getElementById('carrier-document-list');
-                    if (documentList) {
-                        const newDocHtml = `
-                            <div class="flex items-center justify-between text-sm ml-7 mt-2" id="${newDoc.id}">
-                                <span class="truncate pr-2 text-gray-600">${file.name}</span>
-                                <div class="flex space-x-2">
-                                    <button class="px-3 py-1 text-xs text-text-blue border border-text-blue rounded-full hover:bg-blue-50 transition" onclick="handleDocumentAction('View', '${file.name}')">View</button>
-                                    <button class="px-3 py-1 text-xs text-white bg-primary-red rounded-full hover:bg-red-600 transition" onclick="removeCarrierDocument('${newDoc.id}', '${file.name}')">Remove</button>
-                                </div>
-                            </div>
-                        `;
-                        // Prepend the new document to the list
-                        documentList.insertAdjacentHTML('afterbegin', newDocHtml);
-                    }
-                    
-                    markDirty(); // Mark changes as unsaved and show the banner
-                    showMessage(`Document added, click 'Update Changes' to save.`, "bg-accent-yellow text-gray-800");
-
-                }, 1500);
-            }
-        }
-        
-        function removeCarrierDocument(docId, fileName) {
-             // 1. Remove from the mock data
-            MOCK_SHIPMENT.carrierDocuments = MOCK_SHIPMENT.carrierDocuments.filter(doc => doc.id !== docId);
-
-            // 2. Remove from the DOM
-            const docElement = document.getElementById(docId);
-            if (docElement) {
-                docElement.remove();
-            }
-
-            // 3. Update the dirty state
-            if (checkIfDirty()) {
-                 markDirty(); // Re-check if other changes (like the tracking link) remain
-            } else {
-                 markClean(); // If no changes are left, hide the banner
-            }
-            
-            showMessage(`Document removed locally: ${fileName}. Click 'Update Changes' to finalize removal.`, "bg-accent-yellow text-gray-800");
-        }
-
-        function handleDragOver(event) {
-            event.preventDefault(); 
-            const dropzone = document.getElementById('drop-zone');
-            if (dropzone) {
-                dropzone.classList.add('border-primary-blue', 'bg-blue-50', 'scale-[1.01]', 'shadow-inner');
-            }
-        }
-
-        function handleDragLeave(event) {
-            event.preventDefault();
-            const dropzone = document.getElementById('drop-zone');
-            if (dropzone) {
-                dropzone.classList.remove('border-primary-blue', 'bg-blue-50', 'scale-[1.01]', 'shadow-inner');
-            }
-        }
-
-        function handleDrop(event) {
-            event.preventDefault();
-            handleDragLeave(event); 
-            
-            if (event.dataTransfer.files.length > 0) {
-                uploadFile(event.dataTransfer.files[0]);
-            } else {
-                showMessage("No files dropped or file type not supported.", "bg-primary-red");
-            }
-        }
-
-        // --- MODAL AND ACTION LOGIC (Unchanged from previous revision) ---
-
-        function openModal(action, title, message) {
-            currentAction = action;
-            const modal = document.getElementById('confirmation-modal');
-            
-            if (!modal) {
-                console.error("[Modal Error] Element 'confirmation-modal' not found.");
-                showMessage("Internal Error: Modal system missing.", "bg-primary-red");
-                return;
-            }
-            
-            const confirmBtn = document.getElementById('modal-confirm-btn');
-
-            document.getElementById('modal-title').innerText = title;
-            document.getElementById('modal-message').innerHTML = message;
-            
-            if (action === 'Cancel Shipment') {
-                confirmBtn.className = 'px-4 py-2 text-sm font-semibold text-white rounded-md transition bg-primary-red hover:bg-red-600';
-                confirmBtn.innerText = 'Confirm Cancel';
-            } else { // Mark as Delivered
-                confirmBtn.className = 'px-4 py-2 text-sm font-semibold text-white rounded-md transition bg-primary-green hover:bg-green-600';
-                confirmBtn.innerText = 'Confirm Delivery';
-            }
-
-            modal.classList.remove('hidden');
-        }
-
-        function closeModal() {
-            document.getElementById('confirmation-modal')?.classList.add('hidden');
-            currentAction = null;
-        }
-
-        function confirmAction() {
-            closeModal();
-
-            let message = "";
-            let bgColor = "bg-primary-blue";
-
-            if (currentAction === 'Mark as Delivered') {
-                message = "Shipment successfully marked as Delivered! Awaiting final payment confirmation.";
-                bgColor = "bg-primary-green";
-            } else if (currentAction === 'Cancel Shipment') {
-                message = "The Cancellation Request has been sent to the shipper for review.";
-                bgColor = "bg-primary-red";
-            }
-
-            showMessage(message, bgColor);
-        }
-
-        function handleAction(action) {
-            if (action === 'Mark as Delivered') {
-                // Corrected message for Delivery
-                const message = `Are you sure you want to mark this shipment as <strong>delivered</strong>?`;
-                openModal(action, 'Confirm Delivery', message);
-            } else if (action === 'Cancel Shipment') {
-                // Corrected message for Cancellation
-                const message = `Are you sure you want to <strong>cancel this shipment</strong>?`;
-                openModal(action, 'Confirm Cancellation', message);
-            }
-        }
-
-        function handleDocumentAction(actionType, fileName) {
-            let message = "";
-            let bgColor = "bg-primary-blue";
-
-            if (actionType === 'View') {
-                message = `Simulating view for document: ${fileName}...`;
-            } else if (actionType === 'Download') {
-                message = `Simulating download for document: ${fileName}...`;
-            }
-            showMessage(message, bgColor);
-        }
-
-        // --- TOAST/MESSAGE BOX LOGIC (Unchanged from previous revision) ---
-
-        function showMessage(text, color) {
-            const box = document.getElementById('message-box');
-            if (!box) return; 
-            
-            const messageEl = document.createElement('div');
-            messageEl.className = `p-4 rounded-lg shadow-xl text-white ${color} mb-2 transition-opacity duration-300 ease-out opacity-0`;
-            messageEl.innerText = text;
-
-            box.prepend(messageEl);
-
-            // Animate in
-            setTimeout(() => messageEl.classList.remove('opacity-0'), 10);
-
-            // Animate out and remove
-            setTimeout(() => {
-                messageEl.classList.add('opacity-0');
-                setTimeout(() => messageEl.remove(), 500);
-            }, 5000);
-        }
-    </script>
-</head>
-<body>
-    <div id="app">
-        <!-- Content will be rendered here by JavaScript -->
+  // Helper component for layout
+  const DetailCard: React.FC<{ title: string; children: React.ReactNode; className?: string }> = ({ title, children, className = '' }) => (
+    <div className={`info-card p-6 ${className}`}>
+      <h2 className="text-xl font-bold text-gray-800 mb-4 border-b pb-2 flex items-center">
+        {title === 'Shipment Specifications' && <Scale className="w-5 h-5 mr-2 text-primary-blue" />}
+        {title === 'Scheduling' && <Calendar className="w-5 h-5 mr-2 text-primary-red" />}
+        {title === 'Attachments' && <FileText className="w-5 h-5 mr-2 text-gray-500" />}
+        {title === 'Special Notes' && <Truck className="w-5 h-5 mr-2 text-yellow-700" />}
+        {title}
+      </h2>
+      {children}
     </div>
-</body>
-</html>
+  );
+  
+  // Combine all documents for display
+  const allDocuments = useMemo(() => [
+      ...MOCK_SHIPMENT.shipperDocuments,
+      ...carrierDocuments,
+  ], [carrierDocuments]);
+
+
+  return (
+    <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
+      
+      {/* HEADER ROW: TITLE AND LIVE TRACKING INPUT */}
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-gray-200 pb-3">
+        <h1 className="text-2xl font-bold text-gray-800">Shipment Details ({MOCK_SHIPMENT.loadId})</h1>
+        
+        {/* TRACKING LINK INPUT FIELD */}
+        <div className="flex flex-col md:flex-row items-start md:items-center text-sm mt-2 md:mt-0">
+            <label htmlFor="tracking-link" className="font-semibold text-gray-700 mr-2 whitespace-nowrap">Tracking Link:</label>
+            <input 
+                type="url" 
+                id="tracking-link" 
+                value={trackingLink} 
+                onChange={handleTrackingLinkChange}
+                placeholder="Paste your live tracking URL here"
+                className="w-full md:w-80 p-2 border border-gray-300 rounded-md text-text-blue focus:ring-primary-blue focus:border-primary-blue text-sm truncate transition duration-150"
+            />
+        </div>
+      </div>
+
+      {/* UNSAVED CHANGES BANNER CONTAINER */}
+      {hasUnsavedChanges && (
+        <div className="flex flex-col md:flex-row justify-between items-center unsaved-box p-4 rounded-xl shadow-lg border-2 border-accent-yellow transition duration-300">
+            <p className="text-lg font-bold text-gray-800 mb-3 md:mb-0 flex items-center">
+                <X className="w-6 h-6 mr-2 text-primary-red" />
+                You have unsaved changes.
+            </p>
+            <button 
+                className="flex-1 md:flex-none px-6 py-2 text-sm font-semibold text-white bg-update-purple rounded-full hover:bg-indigo-600 transition shadow-lg" 
+                onClick={handleSaveChanges}
+            >
+                <Save className="w-4 h-4 mr-2" />
+                Update Changes
+            </button>
+        </div>
+      )}
+
+
+      {/* PICKUP AND DELIVERY STOPS (Top Card Row) */}
+      <div className="info-card p-6">
+          <div className="grid md:grid-cols-2 gap-y-6 md:gap-x-12 text-sm">
+              
+              {/* Pickup Stop */}
+              <div className="relative pb-2 md:pr-6 border-b border-gray-200 md:border-b-0">
+                  <p className="text-lg font-bold text-gray-700 mb-2 flex items-center"><MapPin className="w-5 h-5 mr-2 text-primary-green" /> Pickup Stops ({MOCK_SHIPMENT.pickup.stops}):</p>
+                  <p className="text-gray-700 font-normal">{MOCK_SHIPMENT.pickup.location}</p>
+                  <p className="text-gray-500">Contact: {MOCK_SHIPMENT.pickup.contact}</p>
+                  <a href={`tel:${MOCK_SHIPMENT.pickup.phone.replace(/-/g, '')}`} className="absolute top-0 right-0 text-text-blue hover:underline font-semibold">{MOCK_SHIPMENT.pickup.phone}</a>
+              </div>
+
+              {/* Delivery Stop */}
+              <div className="relative pb-2 md:pl-6">
+                  <p className="text-lg font-bold text-gray-700 mb-2 flex items-center"><MapPin className="w-5 h-5 mr-2 text-primary-red" /> Delivery Stops ({MOCK_SHIPMENT.delivery.stops}):</p>
+                  <p className="text-gray-700 font-normal">{MOCK_SHIPMENT.delivery.location}</p>
+                  <p className="text-gray-500">Contact: {MOCK_SHIPMENT.delivery.contact}</p>
+                  <p className="text-gray-500">Email: {MOCK_SHIPMENT.delivery.email}</p>
+                  <a href={`tel:${MOCK_SHIPMENT.delivery.phone.replace(/-/g, '')}`} className="absolute top-0 right-0 text-text-blue hover:underline font-semibold">{MOCK_SHIPMENT.delivery.phone}</a>
+              </div>
+          </div>
+      </div>
+
+
+      {/* SPECIFICATIONS, SCHEDULING, SKID DETAILS, ATTACHMENTS (Main 2x2 Grid) */}
+      <div className="grid lg:grid-cols-2 gap-6">
+
+        {/* LEFT COLUMN GROUP */}
+        <div className="space-y-6">
+            
+            {/* Shipment Specs */}
+            <DetailCard title="Shipment Specifications">
+                <div className="grid grid-cols-2 gap-3 text-sm">
+                    {/* Row 1 */}
+                    <p className="font-normal text-gray-500">Equipment</p>
+                    <p className="text-right font-bold text-gray-800 text-lg">{MOCK_SHIPMENT.specs.equipment} <span className="font-normal text-gray-500 text-sm">{MOCK_SHIPMENT.specs.equipmentDetail}</span></p>
+
+                    {/* Row 2 */}
+                    <p className="font-normal text-gray-500">Total Weight</p>
+                    <p className="text-right font-bold text-gray-800 text-lg">{MOCK_SHIPMENT.specs.totalWeight}</p>
+
+                    {/* Row 3 */}
+                    <p className="font-normal text-gray-500">Total Skid Quantity</p>
+                    <p className="text-right font-bold text-gray-800 text-lg">{MOCK_SHIPMENT.specs.totalSkidQuantity}</p>
+
+                    {/* Row 4 */}
+                    <p className="font-normal text-gray-500">Est. Linear Feet</p>
+                    <p className="text-right font-bold text-gray-800 text-lg">{MOCK_SHIPMENT.specs.estLinearFeet}</p>
+                </div>
+            </DetailCard>
+            
+            {/* Skid Details */}
+            <DetailCard title="Skid Details">
+                <table className="w-full text-sm text-gray-700">
+                    <thead className="text-xs text-gray-600 uppercase bg-gray-50 rounded-t-lg">
+                        <tr>
+                            <th scope="col" className="py-3 pl-3 text-left rounded-tl-lg">Quantity</th>
+                            <th scope="col" className="py-3 text-center">Dimensions (L×W×H)</th>
+                            <th scope="col" className="py-3 pr-3 text-right rounded-tr-lg">Weight Per Skid (LBS)</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {MOCK_SHIPMENT.skids.map((skid, index) => (
+                            <tr key={index} className="bg-white border-b last:border-b-0">
+                                <td className="py-4 pl-3 font-semibold text-gray-800 text-left">{skid.quantity}</td>
+                                <td className="py-4 font-semibold text-gray-800 text-center">{skid.dimensions}</td>
+                                <td className="py-4 pr-3 font-semibold text-gray-800 text-right">{skid.weight.toLocaleString()}</td>
+                            </tr>
+                        ))}
+                    </tbody>
+                </table>
+            </DetailCard>
+        </div>
+
+        {/* RIGHT COLUMN GROUP */}
+        <div className="space-y-6">
+            
+            {/* Scheduling */}
+            <DetailCard title="Scheduling">
+                <div className="space-y-4 text-sm">
+                    <div className="flex justify-between items-center p-2 bg-gray-50 rounded-lg">
+                        <p className="font-normal text-gray-500 flex items-center"><Calendar className="w-4 h-4 mr-2" /> Pickup Deadline</p>
+                        <p className="text-text-red font-bold text-lg">{MOCK_SHIPMENT.scheduling.pickupDeadline}</p>
+                    </div>
+                    <div className="flex justify-between items-center p-2 bg-gray-50 rounded-lg">
+                        <p className="font-normal text-gray-500 flex items-center"><Calendar className="w-4 h-4 mr-2" /> Drop Off Deadline</p>
+                        <p className="text-text-red font-bold text-lg">{MOCK_SHIPMENT.scheduling.dropOffDeadline}</p>
+                    </div>
+                </div>
+            </DetailCard>
+
+            {/* Attachments */}
+            <DetailCard title="Attachments">
+                <div className="space-y-4">
+                    {/* Shipper Documents */}
+                    <p className="font-bold text-gray-700">Shipper Documents:</p>
+                    <div className="space-y-2">
+                        {MOCK_SHIPMENT.shipperDocuments.map(doc => (
+                            <DocumentRow key={doc.id} doc={doc} />
+                        ))}
+                    </div>
+
+                    {/* Carrier Documents */}
+                    <p className="font-bold text-gray-700 pt-4">Your Documents:</p>
+                    <div className="space-y-2" id="carrier-document-list">
+                        {carrierDocuments.map(doc => (
+                            // Only carrier docs get the onRemove prop
+                            <DocumentRow key={doc.id} doc={doc} onRemove={handleRemoveAttachment} />
+                        ))}
+                    </div>
+
+                    {/* File Upload/Drop Zone */}
+                    <input 
+                        type="file" 
+                        id="carrier-file-upload" 
+                        className="hidden" 
+                        onChange={handleFileUpload}
+                        // Added accept attribute for better UX
+                        accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
+                    />
+                    <div 
+                        className="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center cursor-pointer hover:bg-blue-50 transition mt-4 shadow-inner"
+                        onClick={() => document.getElementById('carrier-file-upload')?.click()}
+                    >
+                        <div className='flex items-center justify-center text-primary-blue font-semibold'>
+                            <Upload className="w-5 h-5 mr-2" />
+                            Click to upload or drag and drop (Max 10MB)
+                        </div>
+                    </div>
+                </div>
+            </DetailCard>
+        </div>
+      </div>
+
+
+      {/* SPECIAL NOTES (Full Width) */}
+      <DetailCard title="Special Notes" className="bg-accent-yellow border border-yellow-300">
+        <p className="text-sm text-gray-700">{MOCK_SHIPMENT.notes}</p>
+      </DetailCard>
+      
+
+      {/* CONFIRMED BANNER / ACTIONS (Full Width) */}
+      <div className="flex flex-col md:flex-row justify-between items-center confirmed-box p-4 rounded-xl shadow-lg mt-6 border-2 border-primary-green">
+          <p className="text-lg font-bold text-primary-green mb-3 md:mb-0 flex items-center">
+              <Truck className="w-6 h-6 mr-2" />
+              You won this bid! Rate: <span className="text-2xl font-extrabold ml-2">$ {MOCK_SHIPMENT.awardedRate.toLocaleString()}</span>
+          </p>
+          <div className="flex space-x-3 w-full md:w-auto justify-end">
+              <button className="flex-1 md:flex-none px-4 py-2 text-sm font-semibold text-text-red border border-text-red bg-white rounded-full hover:bg-red-50 transition shadow-sm">
+                  Cancel Shipment
+              </button>
+              <button className="flex-1 md:flex-none px-4 py-2 text-sm font-semibold text-white bg-primary-green rounded-full hover:bg-green-600 transition shadow-lg">
+                  Mark as Delivered
+              </button>
+          </div>
+      </div>
+      
+      {/* Message Box for Toasts */}
+      {message && (
+        <div className={`fixed bottom-4 right-4 z-50 p-4 rounded-lg shadow-xl text-white ${message.color} transition-opacity duration-300 ease-out animate-pulse`}>
+            {message.text}
+        </div>
+      )}
+
+    </div>
+  );
+};
+
+export default CarrierDetailView;
+
+// Custom colors and utility classes used in Tailwind setup:
+/*
+.info-card { background-color: white; border-radius: 8px; box-shadow: ...; border: 1px solid #e5e7eb; }
+.confirmed-box { background-color: #d1fae5; border: 2px solid #34d399; }
+.unsaved-box { background-color: #fefcbf; border: 2px solid #facc15; }
+.text-primary-blue: #3b82f6
+.text-primary-green: #34d399
+.text-primary-red: #ef4444
+.bg-update-purple: #5c63ec
+.bg-accent-yellow: #fef3c7
+*/
