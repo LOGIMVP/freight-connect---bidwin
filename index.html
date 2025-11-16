@@ -47,6 +47,13 @@
             gap: 0.75rem; 
             align-items: center;
         }
+        
+        /* --- FIX FOR SKID DETAILS ALIGNMENT --- */
+        /* Target the second column (Dimensions) of the Skid Details table to ensure center alignment */
+        .skid-details-table th:nth-child(2),
+        .skid-details-table td:nth-child(2) {
+            text-align: center;
+        }
     </style>
     <script>
         tailwind.config = {
@@ -272,12 +279,13 @@
                             <!-- Skid Details -->
                             <div class="info-card p-6">
                                 <h2 class="section-header">Skid Details</h2>
-                                <table class="w-full text-sm text-gray-700">
+                                <!-- Added skid-details-table class for custom CSS targeting -->
+                                <table class="w-full text-sm text-gray-700 skid-details-table">
                                     <thead class="text-xs text-gray-600 uppercase bg-gray-50">
                                         <tr>
                                             <!-- Aligned Quantity header to left -->
                                             <th scope="col" class="py-3 pl-3 text-left">Quantity</th>
-                                            <!-- Centered Dimensions header -->
+                                            <!-- Centered Dimensions header (CSS will enforce center) -->
                                             <th scope="col" class="py-3 text-center">Dimensions (L×W×H IN)</th>
                                             <!-- Aligned Weight header to right -->
                                             <th scope="col" class="py-3 pr-3 text-right">Weight Per Skid (LBS)</th>
@@ -286,11 +294,11 @@
                                     <tbody>
                                         ${shipment.skids.map(skid => `
                                             <tr class="bg-white border-b last:border-b-0">
-                                                <!-- Added text-left for data cell alignment -->
+                                                <!-- Left alignment -->
                                                 <td class="py-4 pl-3 font-semibold text-gray-800 text-left">${skid.quantity}</td>
-                                                <!-- Added text-center for data cell alignment -->
+                                                <!-- Center alignment (CSS will enforce center) -->
                                                 <td class="py-4 font-semibold text-gray-800 text-center">${skid.dimensions}</td>
-                                                <!-- Added text-right for data cell alignment -->
+                                                <!-- Right alignment -->
                                                 <td class="py-4 pr-3 font-semibold text-gray-800 text-right">${skid.weight.toLocaleString()}</td>
                                             </tr>
                                         `).join('')}
