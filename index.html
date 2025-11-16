@@ -1,4 +1,4 @@
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -120,6 +120,13 @@
         });
 
         // --- STATE MANAGEMENT ---
+        
+        // Function to check if there are any changes (tracking link OR documents)
+        function checkIfDirty() {
+            const trackingLinkChanged = document.getElementById('tracking-link').value !== initialTrackingLink;
+            const pendingDocuments = MOCK_SHIPMENT.carrierDocuments.length > 0;
+            return trackingLinkChanged || pendingDocuments;
+        }
 
         function markDirty() {
             if (!hasUnsavedChanges) {
@@ -134,8 +141,12 @@
             
             // Simulate API latency
             setTimeout(() => {
+                // Update the "initial" state to reflect the saved state
+                initialTrackingLink = document.getElementById('tracking-link').value;
+                MOCK_SHIPMENT.trackingLink = initialTrackingLink;
+
+                // Mark clean and update banner
                 hasUnsavedChanges = false;
-                initialTrackingLink = MOCK_SHIPMENT.trackingLink; // Update the "initial" state
                 updateUnsavedBanner();
                 showMessage("Shipment details updated successfully.", "bg-primary-green");
             }, 1000);
@@ -384,17 +395,16 @@
 
         // --- TRACKING LINK HANDLING ---
         function handleTrackingLinkChange(link) {
-            // Check if the link has changed from the initial/last saved value
-            if (link !== initialTrackingLink || MOCK_SHIPMENT.carrierDocuments.length > 0) {
+            // Update the mock object value immediately for reference
+            MOCK_SHIPMENT.trackingLink = link;
+
+            // Check if ANY changes (link or documents) exist and update the banner state
+            if (checkIfDirty()) {
                 markDirty();
-            } else if (link === initialTrackingLink && MOCK_SHIPMENT.carrierDocuments.length === 0) {
-                 // Logic to remove dirty state if user reverts link and no docs are pending
+            } else {
                  hasUnsavedChanges = false;
                  updateUnsavedBanner();
             }
-
-            // Temporarily update the mock object value
-            MOCK_SHIPMENT.trackingLink = link;
         }
 
 
@@ -439,7 +449,8 @@
                                 </div>
                             </div>
                         `;
-                        documentList.innerHTML = newDocHtml + documentList.innerHTML;
+                        // Prepend the new document to the list
+                        documentList.insertAdjacentHTML('afterbegin', newDocHtml);
                     }
                     
                     markDirty(); // Mark changes as unsaved
@@ -456,12 +467,12 @@
             // Remove from the DOM
             document.getElementById(docId)?.remove();
 
-            // Check if any changes remain (just tracking link for simplicity)
-            if (MOCK_SHIPMENT.trackingLink === initialTrackingLink && MOCK_SHIPMENT.carrierDocuments.length === 0) {
+            // Check if any changes remain (tracking link or other docs)
+            if (checkIfDirty()) {
+                 markDirty(); 
+            } else {
                  hasUnsavedChanges = false;
                  updateUnsavedBanner();
-            } else {
-                 markDirty(); 
             }
             
             showMessage(`Document marked for removal: ${fileName}. Click 'Update Changes' to save.`, "bg-accent-yellow text-gray-800");
@@ -494,7 +505,7 @@
             }
         }
 
-        // --- MODAL AND ACTION LOGIC ---
+        // --- MODAL AND ACTION LOGIC (Unchanged from previous revision) ---
 
         function openModal(action, title, message) {
             currentAction = action;
@@ -568,7 +579,7 @@
             showMessage(message, bgColor);
         }
 
-        // --- TOAST/MESSAGE BOX LOGIC ---
+        // --- TOAST/MESSAGE BOX LOGIC (Unchanged from previous revision) ---
 
         function showMessage(text, color) {
             const box = document.getElementById('message-box');
