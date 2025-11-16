@@ -235,9 +235,25 @@
                                         <svg class="w-5 h-5 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0l-4 4m4-4v12"></path></svg>
                                         Carrier Documents:
                                     </p>
-                                    <div class="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:bg-gray-50 transition">
-                                        <p class="text-sm text-text-blue font-semibold">Click to upload or drag and drop</p>
+                                    
+                                    <!-- Container for dynamically added documents -->
+                                    <div id="carrier-document-list" class="space-y-2">
+                                        <!-- Documents uploaded by the carrier will appear here -->
                                     </div>
+
+                                    <!-- Hidden File Input (Triggered by click on drop-zone) -->
+                                    <input type="file" id="carrier-file-upload" class="hidden" onchange="handleFileSelect(event)">
+                                    
+                                    <!-- Drop Zone / Click Target -->
+                                    <div id="drop-zone" 
+                                        class="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:bg-gray-50 transition mt-4"
+                                        onclick="document.getElementById('carrier-file-upload').click()"
+                                        ondragover="handleDragOver(event)"
+                                        ondragleave="handleDragLeave(event)"
+                                        ondrop="handleDrop(event)">
+                                        <p class="text-sm text-text-blue font-semibold">Click to upload or drag and drop (Max 10MB)</p>
+                                    </div>
+
                                 </div>
                             </div>
                         </div>
@@ -290,10 +306,80 @@
             `;
         }
 
+        // --- FILE UPLOAD / DRAG AND DROP LOGIC ---
+
+        function handleFileSelect(event) {
+            const files = event.target.files;
+            if (files.length > 0) {
+                uploadFile(files[0]);
+            }
+        }
+
+        function uploadFile(file) {
+            if (file) {
+                // Simple file size check (e.g., max 10MB)
+                if (file.size > 10 * 1024 * 1024) {
+                    showMessage(`File size exceeds 10MB limit: ${file.name}`, "bg-primary-red");
+                    return;
+                }
+
+                // Simulate upload delay
+                showMessage(`Uploading file: ${file.name} (simulated)...`, "bg-primary-blue");
+
+                // Simulate a successful upload after a short delay
+                setTimeout(() => {
+                    const documentList = document.getElementById('carrier-document-list');
+                    if (documentList) {
+                        // Create the HTML for the new document entry
+                        const newDocHtml = `
+                            <div class="flex items-center justify-between text-sm ml-7 mt-2">
+                                <span class="truncate pr-2 text-gray-600">${file.name}</span>
+                                <div class="flex space-x-2">
+                                    <button class="px-3 py-1 text-xs text-text-blue border border-text-blue rounded-full hover:bg-blue-50 transition" onclick="handleAction('View Document')">View</button>
+                                    <button class="px-3 py-1 text-xs text-white bg-text-blue rounded-full hover:bg-blue-600 transition" onclick="handleAction('Download Document')">Download</button>
+                                </div>
+                            </div>
+                        `;
+                        // Prepend the new document for visibility
+                        documentList.innerHTML = newDocHtml + documentList.innerHTML;
+                    }
+                    showMessage(`File uploaded successfully: ${file.name}`, "bg-primary-green");
+                }, 1500);
+            }
+        }
+
+        function handleDragOver(event) {
+            event.preventDefault(); // Necessary to allow drop
+            const dropzone = document.getElementById('drop-zone');
+            if (dropzone) {
+                // Add visual feedback for drag-over
+                dropzone.classList.add('border-primary-blue', 'bg-blue-50', 'scale-[1.01]', 'shadow-inner');
+            }
+        }
+
+        function handleDragLeave(event) {
+            event.preventDefault();
+            const dropzone = document.getElementById('drop-zone');
+            if (dropzone) {
+                // Reset visual style
+                dropzone.classList.remove('border-primary-blue', 'bg-blue-50', 'scale-[1.01]', 'shadow-inner');
+            }
+        }
+
+        function handleDrop(event) {
+            event.preventDefault();
+            handleDragLeave(event); // Reset visual style
+            
+            if (event.dataTransfer.files.length > 0) {
+                uploadFile(event.dataTransfer.files[0]);
+            } else {
+                showMessage("No files dropped or file type not supported.", "bg-primary-red");
+            }
+        }
+
         // --- MODAL AND ACTION LOGIC ---
 
         function openModal(action, title, message) {
-            console.log(`[Modal] Attempting to open modal for action: ${action}`);
             currentAction = action;
             const modal = document.getElementById('confirmation-modal');
             
@@ -317,7 +403,6 @@
                 confirmBtn.innerText = 'Confirm Delivery';
             }
 
-            // This is the critical line to make it visible
             modal.classList.remove('hidden');
         }
 
@@ -346,10 +431,12 @@
 
         function handleAction(action) {
             if (action === 'Mark as Delivered') {
-                const message = `Are you sure you want to mark Load #${MOCK_SHIPMENT.loadId} as <strong>Delivered</strong>? This action will initiate the payment process.`;
+                // Updated message for Delivery
+                const message = `Are you sure you want to mark this shipment as <strong>Delivered</strong>? This action will initiate the payment process.`;
                 openModal(action, 'Confirm Delivery', message);
             } else if (action === 'Cancel Shipment') {
-                const message = `Are you sure you want to <strong>Cancel</strong> Load #${MOCK_SHIPMENT.loadId}? This may result in penalties.`;
+                // Updated message for Cancellation
+                const message = `Are you sure you want to <strong>cancel this shipment</strong>? This may result in penalties.`;
                 openModal(action, 'Confirm Cancellation', message);
             } else {
                 // Document actions (no confirmation modal needed)
