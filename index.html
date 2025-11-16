@@ -27,17 +27,18 @@
         .detail-item {
             padding: 4px 0;
         }
+        /* Styling for the Confirmed/Awarded Banner */
         .confirmed-box {
             background-color: #d1fae5; /* green-100 */
             border-top: 2px solid #34d399;
             border-bottom: 2px solid #34d399;
         }
-        /* Specific styling to match the internal structure of the screenshot */
+        /* Specific styling for the 2-column specs layout */
         .spec-grid {
             display: grid;
             grid-template-columns: 1fr 1fr;
             grid-template-rows: repeat(4, auto);
-            gap: 0.75rem; /* space-x-3/space-y-3 */
+            gap: 0.75rem; 
             align-items: center;
         }
     </style>
@@ -57,7 +58,7 @@
             }
         }
 
-        // Mock Data is updated to match the latest screenshot content
+        // Mock Data for a confirmed shipment
         const MOCK_SHIPMENT = {
             loadId: "L-4839",
             pickup: {
@@ -91,20 +92,11 @@
             documents: [
                 { name: "pickup_ref_54321.pdf", url: "#" }
             ],
+            // The critical data point for the awarded rate
             awardedRate: 1100.00
         };
 
-        let isLoadAwarded = true; // Setting to true for this version as the screenshot shows the awarded state
-
         document.addEventListener('DOMContentLoaded', () => {
-            const urlParams = new URLSearchParams(window.location.search);
-            // Allow override via URL parameter, but default to true
-            if (urlParams.get('awarded') === 'false') {
-                isLoadAwarded = false;
-            } else if (urlParams.get('awarded') === 'true') {
-                 isLoadAwarded = true;
-            }
-
             renderShipmentDetails(MOCK_SHIPMENT);
         });
 
@@ -115,15 +107,13 @@
                     
                     <!-- HEADER ROW: TITLE AND LIVE TRACKING -->
                     <div class="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-gray-200 pb-3">
-                        <h1 class="text-2xl font-bold text-gray-800">${isLoadAwarded ? 'Detailed Shipment Information' : 'Load #' + shipment.loadId}</h1>
-                        ${isLoadAwarded ? `
-                            <div class="flex items-center text-sm mt-2 md:mt-0">
-                                <span class="font-semibold text-gray-700 mr-2">Live Tracking Link:</span>
-                                <a href="https://cloud.samsara.com/load-details/${shipment.loadId}" target="_blank" class="text-text-blue hover:underline truncate max-w-xs sm:max-w-full">
-                                    https://cloud.samsara.com/...
-                                </a>
-                            </div>
-                        ` : ''}
+                        <h1 class="text-2xl font-bold text-gray-800">Detailed Shipment Information</h1>
+                        <div class="flex items-center text-sm mt-2 md:mt-0">
+                            <span class="font-semibold text-gray-700 mr-2">Live Tracking Link:</span>
+                            <a href="https://cloud.samsara.com/load-details/${shipment.loadId}" target="_blank" class="text-text-blue hover:underline truncate max-w-xs sm:max-w-full">
+                                https://cloud.samsara.com/...
+                            </a>
+                        </div>
                     </div>
 
                     <!-- PICKUP AND DELIVERY STOPS (Top Card Row) -->
@@ -255,37 +245,23 @@
                     </div>
 
                     
-                    <!-- CONFIRMED BANNER (Full Width - only if awarded) -->
-                    ${isLoadAwarded ? `
-                        <div class="flex justify-between items-center confirmed-box p-4 rounded-lg shadow-md">
-                            <p class="text-lg font-bold text-primary-green">
-                                You won this bid! Rate: $${shipment.awardedRate.toLocaleString()}
-                            </p>
-                            <div class="flex space-x-3">
-                                <button class="px-4 py-2 text-sm font-semibold text-text-red border border-text-red bg-white rounded-md hover:bg-red-50 transition" onclick="handleAction('Cancel Shipment')">
-                                    Cancel Shipment
-                                </button>
-                                <button class="px-4 py-2 text-sm font-semibold text-white bg-primary-green rounded-md hover:bg-green-600 transition" onclick="handleAction('Mark as Delivered')">
-                                    Mark as Delivered
-                                </button>
-                            </div>
-                        </div>
-                    ` : ''}
-                    
-                    <!-- BID SUBMISSION BOX (Full Width - only if NOT Awarded) -->
-                    ${!isLoadAwarded ? `
-                        <div class="info-card p-6 space-y-4">
-                            <h2 class="text-xl font-bold text-primary-blue">Submit Your Bid</h2>
-                            <input type="number" id="bid-price" placeholder="$ 1250 (Required)" class="w-full p-3 border border-gray-300 rounded-md focus:ring-primary-blue focus:border-primary-blue">
-                            <textarea id="bid-notes" rows="2" placeholder="Notes (e.g., Available today, 53' Dry Van)" class="w-full p-3 border border-gray-300 rounded-md focus:ring-primary-blue focus:border-primary-blue"></textarea>
-                            <button class="w-full py-3 bg-primary-blue text-white font-bold rounded-md hover:bg-blue-600 transition" onclick="handleAction('Submit Bid')">
-                                Submit Bid
+                    <!-- CONFIRMED BANNER / ACTIONS (Full Width) -->
+                    <div class="flex flex-col md:flex-row justify-between items-center confirmed-box p-4 rounded-lg shadow-md">
+                        <p class="text-lg font-bold text-primary-green mb-3 md:mb-0">
+                            You won this bid! Rate: <span class="text-2xl">$${shipment.awardedRate.toLocaleString()}</span>
+                        </p>
+                        <div class="flex space-x-3 w-full md:w-auto justify-end">
+                            <button class="flex-1 md:flex-none px-4 py-2 text-sm font-semibold text-text-red border border-text-red bg-white rounded-md hover:bg-red-50 transition" onclick="handleAction('Cancel Shipment')">
+                                Cancel Shipment
+                            </button>
+                            <button class="flex-1 md:flex-none px-4 py-2 text-sm font-semibold text-white bg-primary-green rounded-md hover:bg-green-600 transition" onclick="handleAction('Mark as Delivered')">
+                                Mark as Delivered
                             </button>
                         </div>
-                    ` : ''}
+                    </div>
 
 
-                    <!-- Message Box for Alerts -->
+                    <!-- Message Box for Alerts (No alert() used) -->
                     <div id="message-box" class="fixed bottom-4 right-4 z-50"></div>
 
                 </div>
@@ -296,16 +272,7 @@
             let message = "";
             let bgColor = "bg-primary-blue";
 
-            if (action === 'Submit Bid') {
-                const price = document.getElementById('bid-price').value;
-                if (!price) {
-                    message = "Please enter a bid amount.";
-                    bgColor = "bg-primary-red";
-                } else {
-                    message = `Bid of $${parseFloat(price).toLocaleString()} submitted successfully!`;
-                    bgColor = "bg-primary-green";
-                }
-            } else if (action === 'Mark as Delivered') {
+            if (action === 'Mark as Delivered') {
                 message = "Shipment marked as Delivered! Awaiting final payment confirmation.";
                 bgColor = "bg-primary-green";
             } else if (action === 'Cancel Shipment') {
