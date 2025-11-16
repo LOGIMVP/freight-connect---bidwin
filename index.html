@@ -145,18 +145,22 @@
                     <table class="w-full text-sm text-gray-700">
                         <thead class="text-xs text-gray-600 uppercase bg-gray-50 rounded-t-lg">
                             <tr>
-                                <th scope="col" class="py-2 px-1 text-left font-medium rounded-tl-lg">Quantity</th>
-                                <!-- ADDED text-center for better alignment -->
-                                <th scope="col" class="py-2 px-1 text-center font-medium">Dimensions (L×W×H IN)</th>
-                                <th scope="col" class="py-2 px-1 text-right font-medium rounded-tr-lg">Weight per Skid (LBS)</th>
+                                <!-- Removed px-1 padding and set left alignment -->
+                                <th scope="col" class="py-2 text-left font-medium rounded-tl-lg pl-2">Quantity</th>
+                                
+                                <!-- Removed px-1 padding and set center alignment -->
+                                <th scope="col" class="py-2 text-center font-medium">Dimensions (L×W×H IN)</th>
+                                
+                                <!-- Removed px-1 padding and set right alignment -->
+                                <th scope="col" class="py-2 text-right font-medium rounded-tr-lg pr-2">Weight per Skid (LBS)</th>
                             </tr>
                         </thead>
                         <tbody>
                             <tr class="bg-white border-b last:border-b-0">
-                                <td class="py-3 px-1 font-bold text-gray-800 text-left">9</td>
-                                <!-- UPDATED to text-center to match the header alignment -->
-                                <td class="py-3 px-1 font-bold text-gray-800 text-center">40 x 40 x 40</td>
-                                <td class="py-3 px-1 font-bold text-gray-800 text-right">1,000</td>
+                                <!-- Adjusted padding/alignment on data cells -->
+                                <td class="py-3 font-bold text-gray-800 text-left pl-2">9</td>
+                                <td class="py-3 font-bold text-gray-800 text-center">40 x 40 x 40</td>
+                                <td class="py-3 font-bold text-gray-800 text-right pr-2">1,000</td>
                             </tr>
                         </tbody>
                     </table>
