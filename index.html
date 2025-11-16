@@ -1,4 +1,4 @@
-       <!DOCTYPE html>
+ <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -89,7 +89,7 @@
             skids: [
                 { quantity: 9, dimensions: "40 x 40 x 40", weight: 1000 }
             ],
-            // Updated document structure to include mock view/download URLs
+            // Document structure for display
             documents: [
                 { name: "pickup_ref_54321.pdf", viewUrl: "#view", downloadUrl: "#download" }
             ],
@@ -225,7 +225,7 @@
                                         <div class="flex items-center justify-between text-sm ml-7">
                                             <span class="truncate pr-2 text-gray-600">${doc.name}</span>
                                             <div class="flex space-x-2">
-                                                <!-- Fixed buttons to call handleAction with specific document context -->
+                                                <!-- Calling handleDocumentAction for View/Download -->
                                                 <button class="px-3 py-1 text-xs text-text-blue border border-text-blue rounded-full hover:bg-blue-50 transition" onclick="handleDocumentAction('View', '${doc.name}')">View</button>
                                                 <button class="px-3 py-1 text-xs text-white bg-text-blue rounded-full hover:bg-blue-600 transition" onclick="handleDocumentAction('Download', '${doc.name}')">Download</button>
                                             </div>
@@ -433,15 +433,14 @@
 
         function handleAction(action) {
             if (action === 'Mark as Delivered') {
-                // Updated message: concise
-                const message = `Are you sure you want to mark this shipment as <strong>Delivered</strong>?`;
+                // CORRECTED message for Delivery
+                const message = `Are you sure you want to mark this shipment as <strong>delivered</strong>?`;
                 openModal(action, 'Confirm Delivery', message);
             } else if (action === 'Cancel Shipment') {
-                // Updated message: concise
+                // CORRECTED message for Cancellation
                 const message = `Are you sure you want to <strong>cancel this shipment</strong>?`;
                 openModal(action, 'Confirm Cancellation', message);
             }
-            // Note: Document actions are handled by handleDocumentAction below
         }
 
         function handleDocumentAction(actionType, fileName) {
