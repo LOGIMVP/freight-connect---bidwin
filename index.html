@@ -144,6 +144,11 @@
                 updateUnsavedBanner();
             }
         }
+        
+        function markClean() {
+            hasUnsavedChanges = false;
+            updateUnsavedBanner();
+        }
 
         function saveChanges() {
             // In a real app, this would execute all API calls to save the tracking link and document list
@@ -155,10 +160,12 @@
                 // Update the "initial" state to reflect the saved state
                 initialTrackingLink = trackingLinkInput ? trackingLinkInput.value : MOCK_SHIPMENT.trackingLink;
                 MOCK_SHIPMENT.trackingLink = initialTrackingLink;
+                
+                // Documents in MOCK_SHIPMENT.carrierDocuments are now considered saved/permanent
+                // In a real app, you might clear a temp flag here or persist them.
 
                 // Mark clean and update banner
-                hasUnsavedChanges = false;
-                updateUnsavedBanner();
+                markClean();
                 showMessage("Shipment details updated successfully.", "bg-primary-green");
             }, 1000);
         }
@@ -197,8 +204,9 @@
             `).join('');
 
              // Generate the carrier document list HTML
+            // Note: The ID here is doc-${doc.id} which is used by removeCarrierDocument
             const carrierDocsHtml = shipment.carrierDocuments.map(doc => `
-                <div class="flex items-center justify-between text-sm ml-7 mt-2" id="doc-${doc.id}">
+                <div class="flex items-center justify-between text-sm ml-7 mt-2" id="${doc.id}"> 
                     <span class="truncate pr-2 text-gray-600">${doc.name}</span>
                     <div class="flex space-x-2">
                         <button class="px-3 py-1 text-xs text-text-blue border border-text-blue rounded-full hover:bg-blue-50 transition" onclick="handleDocumentAction('View', '${doc.name}')">View</button>
@@ -424,8 +432,7 @@
             if (checkIfDirty()) {
                 markDirty();
             } else {
-                 hasUnsavedChanges = false;
-                 updateUnsavedBanner();
+                 markClean();
             }
         }
 
@@ -441,7 +448,8 @@
 
         function generateUniqueId() {
             // Simple unique ID for mock tracking
-            return 'doc-' + Date.now();
+            // Using a prefix to distinguish from other potential IDs, and ensure it's unique
+            return 'carrier-doc-' + Date.now() + '-' + Math.floor(Math.random() * 1000);
         }
 
         function uploadFile(file) {
@@ -457,17 +465,19 @@
                 // Simulate a successful upload after a short delay
                 setTimeout(() => {
                     const docId = generateUniqueId();
+                    const newDoc = { id: docId, name: file.name, temp: true };
+                    
                     // Add to mock data (will be saved when 'Update Changes' is clicked)
-                    MOCK_SHIPMENT.carrierDocuments.push({ id: docId, name: file.name, temp: true });
+                    MOCK_SHIPMENT.carrierDocuments.push(newDoc);
 
                     const documentList = document.getElementById('carrier-document-list');
                     if (documentList) {
                         const newDocHtml = `
-                            <div class="flex items-center justify-between text-sm ml-7 mt-2" id="doc-${docId}">
+                            <div class="flex items-center justify-between text-sm ml-7 mt-2" id="${newDoc.id}">
                                 <span class="truncate pr-2 text-gray-600">${file.name}</span>
                                 <div class="flex space-x-2">
                                     <button class="px-3 py-1 text-xs text-text-blue border border-text-blue rounded-full hover:bg-blue-50 transition" onclick="handleDocumentAction('View', '${file.name}')">View</button>
-                                    <button class="px-3 py-1 text-xs text-white bg-primary-red rounded-full hover:bg-red-600 transition" onclick="removeCarrierDocument('${docId}', '${file.name}')">Remove</button>
+                                    <button class="px-3 py-1 text-xs text-white bg-primary-red rounded-full hover:bg-red-600 transition" onclick="removeCarrierDocument('${newDoc.id}', '${file.name}')">Remove</button>
                                 </div>
                             </div>
                         `;
@@ -475,7 +485,7 @@
                         documentList.insertAdjacentHTML('afterbegin', newDocHtml);
                     }
                     
-                    markDirty(); // Mark changes as unsaved
+                    markDirty(); // Mark changes as unsaved and show the banner
                     showMessage(`Document added, click 'Update Changes' to save.`, "bg-accent-yellow text-gray-800");
 
                 }, 1500);
@@ -483,21 +493,23 @@
         }
         
         function removeCarrierDocument(docId, fileName) {
-             // Remove from the mock data
+             // 1. Remove from the mock data
             MOCK_SHIPMENT.carrierDocuments = MOCK_SHIPMENT.carrierDocuments.filter(doc => doc.id !== docId);
 
-            // Remove from the DOM
-            document.getElementById(docId)?.remove();
+            // 2. Remove from the DOM
+            const docElement = document.getElementById(docId);
+            if (docElement) {
+                docElement.remove();
+            }
 
-            // Check if any changes remain (tracking link or other docs)
+            // 3. Update the dirty state
             if (checkIfDirty()) {
-                 markDirty(); 
+                 markDirty(); // Re-check if other changes (like the tracking link) remain
             } else {
-                 hasUnsavedChanges = false;
-                 updateUnsavedBanner();
+                 markClean(); // If no changes are left, hide the banner
             }
             
-            showMessage(`Document marked for removal: ${fileName}. Click 'Update Changes' to save.`, "bg-accent-yellow text-gray-800");
+            showMessage(`Document removed locally: ${fileName}. Click 'Update Changes' to finalize removal.`, "bg-accent-yellow text-gray-800");
         }
 
         function handleDragOver(event) {
