@@ -123,7 +123,10 @@
         
         // Function to check if there are any changes (tracking link OR documents)
         function checkIfDirty() {
-            const trackingLinkChanged = document.getElementById('tracking-link').value !== initialTrackingLink;
+            const trackingLinkInput = document.getElementById('tracking-link');
+            // Safely check if the input exists before accessing its value
+            const currentTrackingLink = trackingLinkInput ? trackingLinkInput.value : MOCK_SHIPMENT.trackingLink;
+            const trackingLinkChanged = currentTrackingLink !== initialTrackingLink;
             const pendingDocuments = MOCK_SHIPMENT.carrierDocuments.length > 0;
             return trackingLinkChanged || pendingDocuments;
         }
@@ -141,8 +144,9 @@
             
             // Simulate API latency
             setTimeout(() => {
+                const trackingLinkInput = document.getElementById('tracking-link');
                 // Update the "initial" state to reflect the saved state
-                initialTrackingLink = document.getElementById('tracking-link').value;
+                initialTrackingLink = trackingLinkInput ? trackingLinkInput.value : MOCK_SHIPMENT.trackingLink;
                 MOCK_SHIPMENT.trackingLink = initialTrackingLink;
 
                 // Mark clean and update banner
@@ -248,16 +252,20 @@
                                 <h2 class="section-header">Shipment Specifications</h2>
                                 <div class="spec-grid text-sm">
                                     <p class="font-normal text-gray-500 detail-item">Equipment</p>
-                                    <p class="text-right font-bold text-gray-800 detail-item">${shipment.specs.equipment} <span class="font-normal text-gray-500">${shipment.specs.equipmentDetail}</span></p>
+                                    <!-- Changed font size to text-lg for consistency -->
+                                    <p class="text-right font-bold text-gray-800 text-lg detail-item">${shipment.specs.equipment} <span class="font-normal text-gray-500 text-sm">${shipment.specs.equipmentDetail}</span></p>
 
                                     <p class="font-normal text-gray-500 detail-item">Total Weight</p>
-                                    <p class="text-right font-bold text-gray-800 detail-item">${shipment.specs.totalWeight}</p>
+                                    <!-- Changed font size to text-lg for consistency -->
+                                    <p class="text-right font-bold text-gray-800 text-lg detail-item">${shipment.specs.totalWeight}</p>
 
                                     <p class="font-normal text-gray-500 detail-item">Total Skid Quantity</p>
-                                    <p class="text-right font-bold text-gray-800 text-xl detail-item">${shipment.specs.totalSkidQuantity}</p>
+                                    <!-- Standardized font size to text-lg from text-xl -->
+                                    <p class="text-right font-bold text-gray-800 text-lg detail-item">${shipment.specs.totalSkidQuantity}</p>
 
                                     <p class="font-normal text-gray-500 detail-item">Est. Linear Feet</p>
-                                    <p class="text-right font-bold text-gray-800 detail-item">${shipment.specs.estLinearFeet}</p>
+                                    <!-- Changed font size to text-lg for consistency -->
+                                    <p class="text-right font-bold text-gray-800 text-lg detail-item">${shipment.specs.estLinearFeet}</p>
                                 </div>
                             </div>
                             
@@ -275,9 +283,10 @@
                                     <tbody>
                                         ${shipment.skids.map(skid => `
                                             <tr class="bg-white border-b last:border-b-0">
-                                                <td class="py-4 pl-3 font-semibold">${skid.quantity}</td>
-                                                <td class="py-4">${skid.dimensions}</td>
-                                                <td class="py-4 pr-3 text-right">${skid.weight.toLocaleString()}</td>
+                                                <!-- Added font-semibold to all data fields for consistency -->
+                                                <td class="py-4 pl-3 font-semibold text-gray-800">${skid.quantity}</td>
+                                                <td class="py-4 font-semibold text-gray-800">${skid.dimensions}</td>
+                                                <td class="py-4 pr-3 text-right font-semibold text-gray-800">${skid.weight.toLocaleString()}</td>
                                             </tr>
                                         `).join('')}
                                     </tbody>
