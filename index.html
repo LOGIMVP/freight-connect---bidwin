@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from 'react';
-import { Truck, MapPin, Calendar, Scale, Ruler, FileText, Upload, Trash2, Save, X, RotateCcw } from 'lucide-react';
+import { Truck, MapPin, Calendar, Scale, FileText, Upload, Trash2, Save, X, RotateCcw, Package, Clock, Link } from 'lucide-react';
 
 // Mock Data Interfaces (Should ideally be imported from types.ts)
 interface Document {
@@ -7,18 +7,23 @@ interface Document {
   name: string;
   url: string;
   type: 'shipper' | 'carrier';
-  // State to track local deletion before saving
   isDeleted?: boolean; 
+}
+
+interface Skid {
+    quantity: number;
+    dimensions: string;
+    weight: number;
 }
 
 interface Shipment {
   loadId: string;
-trackingLink: string;
-  pickup: { location: string; contact: string; phone: string; stops: number };
-  delivery: { location: string; contact: string; email: string; phone: string; stops: number };
+  trackingLink: string;
+  pickup: { location: string; contact: string; phone: string; stops: number; contactPhone: string };
+  delivery: { location: string; contact: string; email: string; phone: string; stops: number; contactPhone: string };
   specs: { equipment: string; equipmentDetail: string; totalWeight: string; totalSkidQuantity: number; estLinearFeet: string };
   scheduling: { pickupDeadline: string; dropOffDeadline: string };
-  skids: { quantity: number; dimensions: string; weight: number }[];
+  skids: Skid[];
   shipperDocuments: Document[];
   awardedRate: number;
   notes: string;
@@ -28,56 +33,55 @@ trackingLink: string;
 const MOCK_SHIPMENT: Shipment = {
   loadId: "L-4839",
   trackingLink: "https://cloud.samsara.com/load-details/L-4839", 
-  pickup: { location: "123 Oilfield Way, Edmonton, AB", contact: "Edmonton Supply", phone: "780-555-0500", stops: 1 },
-  delivery: { location: "789 Central Goods Rd, Winnipeg, MB", contact: "Central Logistics", email: "wpg.logistics@example.com", phone: "204-555-0700", stops: 1 },
+  pickup: { location: "123 Oilfield Way, Edmonton, AB, T5J 0K6", contact: "Edmonton Supply", phone: "780-555-0500", stops: 1, contactPhone: "780-555-0500" },
+  delivery: { location: "789 Central Goods Rd, Winnipeg, MB, R3C 0B4", contact: "Central Logistics", email: "wpg.logistics@example.com", phone: "204-555-0700", stops: 1, contactPhone: "204-555-0700" },
   specs: { equipment: "LTL", equipmentDetail: "(Dry Van)", totalWeight: "9,000 lbs", totalSkidQuantity: 9, estLinearFeet: "12.5 ft" },
   scheduling: { pickupDeadline: "Nov 18, 2025", dropOffDeadline: "Nov 21, 2025" },
   skids: [{ quantity: 9, dimensions: "40 x 40 x 40", weight: 1000 }],
   shipperDocuments: [
-    { id: 'S-1', name: "Bill_of_Lading_123.pdf", url: "#", type: 'shipper' },
-    { id: 'S-2', name: "Pickup_Ref_54321.pdf", url: "#", type: 'shipper' }, 
+    { id: 'S-1', name: "pickup_ref_54321.pdf", url: "#", type: 'shipper' },
   ],
   awardedRate: 1100.00,
-  notes: "Pickup by appointment only. Driver must check in 30 mins prior to arrival.",
+  notes: "Pickup by appointment only.",
 };
 
 // --- Component Helper: DocumentRow ---
 const DocumentRow: React.FC<{ 
     doc: Document; 
-    onStageRemove?: (id: string) => void; // Stage removal (set isDeleted=true)
-    onUndoRemove?: (id: string) => void; // Undo removal (set isDeleted=false)
+    onStageRemove?: (id: string) => void; 
+    onUndoRemove?: (id: string) => void; 
 }> = ({ doc, onStageRemove, onUndoRemove }) => {
     
     const isCarrierDoc = doc.type === 'carrier';
 
     // Conditional styling for pending removal
     const rowClasses = doc.isDeleted 
-        ? "bg-red-100 border-l-4 border-primary-red opacity-60 transition duration-300"
-        : "bg-gray-50 hover:bg-gray-100 transition duration-150";
+        ? "bg-red-50 border-l-4 border-red-500 opacity-90 transition duration-300 shadow-none"
+        : "bg-white hover:bg-gray-50 transition duration-150";
 
     return (
-        <div className={`flex items-center justify-between text-sm ml-7 p-2 rounded-lg ${rowClasses}`}>
+        <div className={`flex items-center justify-between text-sm p-2 rounded-lg ${rowClasses}`}>
             
-            {/* Document Name and Icon */}
+            {/* Document Name */}
             <div className="flex items-center space-x-2 w-2/3 truncate">
-                <FileText className="w-4 h-4 text-primary-blue flex-shrink-0" />
+                <FileText className="w-4 h-4 text-gray-500 flex-shrink-0" />
                 <span 
-                    className={`truncate pr-2 font-medium text-gray-700 ${doc.isDeleted ? 'line-through text-gray-500 italic' : ''}`}
+                    className={`truncate font-medium text-gray-700 ${doc.isDeleted ? 'line-through text-gray-500 italic' : ''}`}
                 >
                     {doc.name}
-                    {doc.isDeleted && <span className="text-primary-red ml-2 text-xs font-bold">(Pending Removal)</span>}
+                    {doc.isDeleted && <span className="text-red-500 ml-2 text-xs font-bold">(Pending)</span>}
                 </span>
             </div>
             
             {/* Actions */}
             <div className="flex space-x-2 flex-shrink-0">
                 
-                {/* View Button (Always visible) */}
+                {/* View Button (Always available) */}
                 <a 
                     href={doc.url} 
                     target="_blank" 
                     rel="noopener noreferrer" 
-                    className="px-3 py-1 text-xs text-primary-blue border border-primary-blue rounded-full hover:bg-blue-50 transition duration-150"
+                    className="px-3 py-1 text-xs text-blue-600 border border-blue-200 rounded-full hover:bg-blue-50 transition duration-150 font-semibold"
                 >
                     View
                 </a>
@@ -87,7 +91,7 @@ const DocumentRow: React.FC<{
                     doc.isDeleted ? (
                         // UNDO Button
                         <button
-                            className="flex items-center px-3 py-1 text-xs text-white bg-primary-green rounded-full hover:bg-green-600 transition duration-150 shadow-sm"
+                            className="flex items-center px-3 py-1 text-xs text-white bg-green-500 rounded-full hover:bg-green-600 transition duration-150 shadow-sm font-semibold"
                             onClick={() => onUndoRemove(doc.id)}
                         >
                             <RotateCcw className="w-3 h-3 mr-1" />
@@ -96,7 +100,7 @@ const DocumentRow: React.FC<{
                     ) : (
                         // REMOVE Button
                         <button
-                            className="flex items-center px-3 py-1 text-xs text-white bg-primary-red rounded-full hover:bg-red-600 transition duration-150 shadow-sm"
+                            className="flex items-center px-3 py-1 text-xs text-white bg-red-500 rounded-full hover:bg-red-600 transition duration-150 shadow-sm font-semibold"
                             onClick={() => onStageRemove(doc.id)}
                         >
                             <Trash2 className="w-3 h-3 mr-1" />
@@ -113,7 +117,6 @@ const DocumentRow: React.FC<{
 // --- Main Component ---
 const CarrierDetailView: React.FC = () => {
   const [trackingLink, setTrackingLink] = useState(MOCK_SHIPMENT.trackingLink);
-  // Documents added or marked for deletion by the carrier
   const [carrierDocuments, setCarrierDocuments] = useState<Document[]>([]);
   
   const initialTrackingLink = MOCK_SHIPMENT.trackingLink;
@@ -126,14 +129,11 @@ const CarrierDetailView: React.FC = () => {
 
   const hasUnsavedChanges = useMemo(() => {
     const linkChanged = trackingLink !== initialTrackingLink;
-    
-    // Check if there are any documents marked for deletion OR any new documents added
     const documentsChanged = carrierDocuments.some(doc => doc.isDeleted || doc.id.startsWith('carrier-doc-'));
-    
     return linkChanged || documentsChanged;
   }, [trackingLink, initialTrackingLink, carrierDocuments]);
 
-  // --- HANDLERS ---
+  // --- HANDLERS (Same as before, ensuring functionality is intact) ---
 
   const handleTrackingLinkChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     setTrackingLink(e.target.value);
@@ -143,11 +143,11 @@ const CarrierDetailView: React.FC = () => {
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 10 * 1024 * 1024) {
-        showMessage(`File size exceeds 10MB limit: ${file.name}`, "bg-primary-red");
+        showMessage(`File size exceeds 10MB limit: ${file.name}`, "bg-red-500");
         return;
       }
 
-      showMessage(`Uploading file: ${file.name} (simulated)...`, "bg-primary-blue");
+      showMessage(`Uploading file: ${file.name} (simulated)...`, "bg-blue-500");
 
       setTimeout(() => {
         const newDoc: Document = {
@@ -161,106 +161,115 @@ const CarrierDetailView: React.FC = () => {
         
         e.target.value = ''; 
         
-        showMessage(`Document added. Ready to save.`, "bg-accent-yellow text-gray-800");
+        showMessage(`Document added. Ready to save.`, "bg-yellow-400 text-gray-800");
 
       }, 1500);
     }
   }, [showMessage]);
 
-  // --- UX IMPROVEMENT: Stage Removal ---
   const handleStageRemove = useCallback((docId: string) => {
-    setCarrierDocuments(prevDocs => {
-        const updatedDocs = prevDocs.map(doc => {
-            if (doc.id === docId) {
-                // Mark for deletion
-                return { ...doc, isDeleted: true };
-            }
-            return doc;
-        });
-        return updatedDocs;
-    });
-
-    showMessage(`Document marked for removal. Click 'Undo' to revert or 'Update Changes' to finalize.`, "bg-accent-yellow text-gray-800");
+    setCarrierDocuments(prevDocs => 
+        prevDocs.map(doc => doc.id === docId ? { ...doc, isDeleted: true } : doc)
+    );
+    showMessage(`Document marked for removal. Click 'Undo' to revert or 'Update Changes' to finalize.`, "bg-yellow-400 text-gray-800");
   }, [showMessage]);
   
-  // --- UX IMPROVEMENT: Undo Removal ---
   const handleUndoRemove = useCallback((docId: string) => {
-    setCarrierDocuments(prevDocs => {
-        const updatedDocs = prevDocs.map(doc => {
-            if (doc.id === docId) {
-                // Unmark for deletion
-                return { ...doc, isDeleted: false };
-            }
-            return doc;
-        });
-        return updatedDocs;
-    });
-
-    showMessage(`Removal successfully undone.`, "bg-primary-green");
+    setCarrierDocuments(prevDocs => 
+        prevDocs.map(doc => doc.id === docId ? { ...doc, isDeleted: false } : doc)
+    );
+    showMessage(`Removal successfully undone.`, "bg-green-500");
   }, [showMessage]);
-  // --- END OF UX IMPROVEMENT ---
 
   const handleSaveChanges = useCallback(() => {
-    showMessage("Saving all updates to tracking link and documents...", "bg-update-purple");
+    showMessage("Saving all updates to tracking link and documents...", "bg-indigo-600");
 
-    // Simulate save success
     setTimeout(() => {
-        // Filter out deleted documents and reset state flags
         const savedDocs = carrierDocuments.filter(doc => !doc.isDeleted);
+        // Reset isDeleted flag on documents that were saved but not deleted
+        setCarrierDocuments(savedDocs.map(doc => ({ ...doc, isDeleted: undefined }))); 
         
-        setCarrierDocuments(savedDocs.map(doc => ({ ...doc, isDeleted: undefined })));
-        
-        showMessage("Shipment details updated successfully.", "bg-primary-green");
+        showMessage("Shipment details updated successfully.", "bg-green-500");
     }, 1500);
-  }, [trackingLink, carrierDocuments, showMessage]);
+  }, [carrierDocuments, showMessage]);
 
 
-  // Helper component for layout
-  const DetailCard: React.FC<{ title: string; children: React.ReactNode; className?: string }> = ({ title, children, className = '' }) => (
-    <div className={`info-card p-6 ${className}`}>
-      <h2 className="text-xl font-bold text-gray-800 mb-4 border-b pb-2 flex items-center">
-        {title === 'Shipment Specifications' && <Scale className="w-5 h-5 mr-2 text-primary-blue" />}
-        {title === 'Scheduling' && <Calendar className="w-5 h-5 mr-2 text-primary-red" />}
-        {title === 'Attachments' && <FileText className="w-5 h-5 mr-2 text-gray-500" />}
-        {title === 'Special Notes' && <Truck className="w-5 h-5 mr-2 text-yellow-700" />}
-        {title}
-      </h2>
-      {children}
-    </div>
-  );
+  // Helper component for Stop Card content
+  const StopCard: React.FC<{ type: 'Pickup' | 'Delivery'; data: Shipment['pickup'] | Shipment['delivery'] }> = ({ type, data }) => {
+      const isPickup = type === 'Pickup';
+      const color = isPickup ? 'text-blue-600' : 'text-purple-600';
+      const phone = data.contactPhone || data.phone;
+      
+      return (
+          <div className="bg-white p-6 rounded-xl shadow-md border border-gray-200 h-full">
+              <h2 className="text-lg font-bold text-gray-700 mb-2">
+                  {type} Stops ({data.stops}):
+              </h2>
+              <div className="space-y-1">
+                  <p className="font-semibold text-gray-800">{data.location}</p>
+                  <p className="text-gray-600 text-sm">Contact: {data.contact}</p>
+                  
+                  {/* Delivery-specific fields */}
+                  {!isPickup && 'email' in data && (
+                    <p className="text-gray-600 text-sm">Email: {data.email}</p>
+                  )}
+                  
+                  {/* Phone link */}
+                  <div className="pt-1">
+                      <a href={`tel:${phone.replace(/-/g, '')}`} className={`text-sm font-medium ${color} hover:underline`}>
+                          {phone}
+                      </a>
+                  </div>
+              </div>
+          </div>
+      );
+  };
   
+  // Helper for inner detail rows (Specs)
+  const DetailRow: React.FC<{ label: string; value: string; detail?: string }> = ({ label, value, detail }) => (
+      <div className="flex justify-between items-start py-3 border-b border-gray-100 last:border-b-0">
+          <p className="text-sm text-gray-500">{label}</p>
+          <div className="text-right">
+              <p className="font-bold text-gray-800">{value}</p>
+              {detail && <p className="text-xs text-gray-500">{detail}</p>}
+          </div>
+      </div>
+  );
 
   return (
-    <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
+    <div className="p-4 md:p-8 max-w-6xl mx-auto space-y-6 bg-gray-50 min-h-screen">
       
       {/* HEADER ROW: TITLE AND LIVE TRACKING INPUT */}
-      <div className="flex flex-col md:flex-row justify-between items-start md:items-center border-b border-gray-200 pb-3">
-        <h1 className="text-2xl font-bold text-gray-800">Shipment Details ({MOCK_SHIPMENT.loadId})</h1>
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-4 space-y-2 sm:space-y-0">
+        <h1 className="text-2xl font-extrabold text-gray-800">
+            Detailed Shipment Information
+        </h1>
         
         {/* TRACKING LINK INPUT FIELD */}
-        <div className="flex flex-col md:flex-row items-start md:items-center text-sm mt-2 md:mt-0">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center text-sm w-full sm:w-auto">
             <label htmlFor="tracking-link" className="font-semibold text-gray-700 mr-2 whitespace-nowrap">Tracking Link:</label>
             <input 
                 type="url" 
                 id="tracking-link" 
                 value={trackingLink} 
                 onChange={handleTrackingLinkChange}
-                placeholder="Paste your live tracking URL here"
-                className="w-full md:w-80 p-2 border border-gray-300 rounded-md text-text-blue focus:ring-primary-blue focus:border-primary-blue text-sm truncate transition duration-150"
+                placeholder="https://cloud.samsara.com/..."
+                className="w-full sm:w-64 p-1 border border-gray-300 rounded-md text-sm text-blue-600 focus:ring-blue-500 focus:border-blue-500 truncate transition duration-150 shadow-inner"
             />
         </div>
       </div>
-
-      {/* UNSAVED CHANGES BANNER CONTAINER */}
+      
+      {/* UNSAVED CHANGES BANNER CONTAINER (Sticky/Fixed positioning might be better in a real app, but static here) */}
       {hasUnsavedChanges && (
-        <div className="flex flex-col md:flex-row justify-between items-center unsaved-box p-4 rounded-xl shadow-lg border-2 border-accent-yellow transition duration-300">
-            <p className="text-lg font-bold text-gray-800 mb-3 md:mb-0 flex items-center">
-                <X className="w-6 h-6 mr-2 text-primary-red" />
+        <div className="flex flex-col md:flex-row justify-between items-center bg-yellow-100 p-4 rounded-xl shadow-lg border border-yellow-300 transition duration-300">
+            <p className="text-base font-semibold text-gray-800 mb-3 md:mb-0 flex items-center">
+                <X className="w-5 h-5 mr-2 text-red-500" />
                 You have unsaved changes.
             </p>
             <button 
-                className="flex-1 md:flex-none px-6 py-2 text-sm font-semibold text-white bg-update-purple rounded-full hover:bg-indigo-600 transition shadow-lg" 
+                className="flex-1 md:flex-none px-6 py-2 text-sm font-semibold text-white bg-indigo-600 rounded-full hover:bg-indigo-700 transition shadow-lg disabled:opacity-50" 
                 onClick={handleSaveChanges}
+                disabled={!hasUnsavedChanges}
             >
                 <Save className="w-4 h-4 mr-2" />
                 Update Changes
@@ -268,111 +277,95 @@ const CarrierDetailView: React.FC = () => {
         </div>
       )}
 
+      {/* --- MAIN GRID LAYOUT --- */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
 
-      {/* PICKUP AND DELIVERY STOPS (Top Card Row) */}
-      <div className="info-card p-6">
-          <div className="grid md:grid-cols-2 gap-y-6 md:gap-x-12 text-sm">
-              
-              {/* Pickup Stop */}
-              <div className="relative pb-2 md:pr-6 border-b border-gray-200 md:border-b-0">
-                  <p className="text-lg font-bold text-gray-700 mb-2 flex items-center"><MapPin className="w-5 h-5 mr-2 text-primary-green" /> Pickup Stops ({MOCK_SHIPMENT.pickup.stops}):</p>
-                  <p className="text-gray-700 font-normal">{MOCK_SHIPMENT.pickup.location}</p>
-                  <p className="text-gray-500">Contact: {MOCK_SHIPMENT.pickup.contact}</p>
-                  <a href={`tel:${MOCK_SHIPMENT.pickup.phone.replace(/-/g, '')}`} className="absolute top-0 right-0 text-text-blue hover:underline font-semibold">{MOCK_SHIPMENT.pickup.phone}</a>
-              </div>
+        {/* 1. STOPS ROW (Uses full width but is internally a grid-cols-2) */}
+        <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-6">
+            <StopCard type="Pickup" data={MOCK_SHIPMENT.pickup} />
+            <StopCard type="Delivery" data={MOCK_SHIPMENT.delivery} />
+        </div>
 
-              {/* Delivery Stop */}
-              <div className="relative pb-2 md:pl-6">
-                  <p className="text-lg font-bold text-gray-700 mb-2 flex items-center"><MapPin className="w-5 h-5 mr-2 text-primary-red" /> Delivery Stops ({MOCK_SHIPMENT.delivery.stops}):</p>
-                  <p className="text-gray-700 font-normal">{MOCK_SHIPMENT.delivery.location}</p>
-                  <p className="text-gray-500">Contact: {MOCK_SHIPMENT.delivery.contact}</p>
-                  <p className="text-gray-500">Email: {MOCK_SHIPMENT.delivery.email}</p>
-                  <a href={`tel:${MOCK_SHIPMENT.delivery.phone.replace(/-/g, '')}`} className="absolute top-0 right-0 text-text-blue hover:underline font-semibold">{MOCK_SHIPMENT.delivery.phone}</a>
-              </div>
-          </div>
-      </div>
-
-
-      {/* SPECIFICATIONS, SCHEDULING, SKID DETAILS, ATTACHMENTS (Main 2x2 Grid) */}
-      <div className="grid lg:grid-cols-2 gap-6">
-
-        {/* LEFT COLUMN GROUP */}
-        <div className="space-y-6">
+        {/* 2. LEFT COLUMN GROUP: SPECS AND SKIDS */}
+        <div className="flex flex-col space-y-6">
             
-            {/* Shipment Specs */}
-            <DetailCard title="Shipment Specifications">
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                    {/* Row 1 */}
-                    <p className="font-normal text-gray-500">Equipment</p>
-                    <p className="text-right font-bold text-gray-800 text-lg">{MOCK_SHIPMENT.specs.equipment} <span className="font-normal text-gray-500 text-sm">{MOCK_SHIPMENT.specs.equipmentDetail}</span></p>
-
-                    {/* Row 2 */}
-                    <p className="font-normal text-gray-500">Total Weight</p>
-                    <p className="text-right font-bold text-gray-800 text-lg">{MOCK_SHIPMENT.specs.totalWeight}</p>
-
-                    {/* Row 3 */}
-                    <p className="font-normal text-gray-500">Total Skid Quantity</p>
-                    <p className="text-right font-bold text-gray-800 text-lg">{MOCK_SHIPMENT.specs.totalSkidQuantity}</p>
-
-                    {/* Row 4 */}
-                    <p className="font-normal text-gray-500">Est. Linear Feet</p>
-                    <p className="text-right font-bold text-gray-800 text-lg">{MOCK_SHIPMENT.specs.estLinearFeet}</p>
+            {/* Shipment Specifications Card */}
+            <div className="bg-white p-6 rounded-xl shadow-md border border-gray-200">
+                <h2 className="text-lg font-bold text-gray-700 mb-4 flex items-center">
+                    <Scale className="w-5 h-5 mr-2 text-gray-500" />
+                    Shipment Specifications
+                </h2>
+                <div className="space-y-1">
+                    <DetailRow label="Equipment" value={MOCK_SHIPMENT.specs.equipment} detail={MOCK_SHIPMENT.specs.equipmentDetail} />
+                    <DetailRow label="Total Weight" value={MOCK_SHIPMENT.specs.totalWeight} />
+                    <DetailRow label="Total Skid Quantity" value={MOCK_SHIPMENT.specs.totalSkidQuantity.toString()} />
+                    <DetailRow label="Est. Linear Feet" value={MOCK_SHIPMENT.specs.estLinearFeet} />
                 </div>
-            </DetailCard>
+            </div>
             
-            {/* Skid Details */}
-            <DetailCard title="Skid Details">
+            {/* Skid Details Card */}
+            <div className="bg-white p-6 rounded-xl shadow-md border border-gray-200">
+                <h2 className="text-lg font-bold text-gray-700 mb-4 flex items-center">
+                    <Package className="w-5 h-5 mr-2 text-gray-500" />
+                    Skid Details
+                </h2>
                 <table className="w-full text-sm text-gray-700">
-                    <thead className="text-xs text-gray-600 uppercase bg-gray-50 rounded-t-lg">
+                    <thead className="text-xs text-gray-600 uppercase bg-gray-50">
                         <tr>
-                            <th scope="col" className="py-3 pl-3 text-left rounded-tl-lg">Quantity</th>
-                            <th scope="col" className="py-3 text-center">Dimensions (L×W×H)</th>
-                            <th scope="col" className="py-3 pr-3 text-right rounded-tr-lg">Weight Per Skid (LBS)</th>
+                            <th scope="col" className="py-2 px-1 text-left">Quantity</th>
+                            <th scope="col" className="py-2 text-center">Dimensions (L×W×H IN)</th>
+                            <th scope="col" className="py-2 px-1 text-right">Weight per Skid (LBS)</th>
                         </tr>
                     </thead>
                     <tbody>
                         {MOCK_SHIPMENT.skids.map((skid, index) => (
                             <tr key={index} className="bg-white border-b last:border-b-0">
-                                <td className="py-4 pl-3 font-semibold text-gray-800 text-left">{skid.quantity}</td>
-                                <td className="py-4 font-semibold text-gray-800 text-center">{skid.dimensions}</td>
-                                <td className="py-4 pr-3 font-semibold text-gray-800 text-right">{skid.weight.toLocaleString()}</td>
+                                <td className="py-3 px-1 font-semibold text-gray-800 text-left">{skid.quantity}</td>
+                                <td className="py-3 font-semibold text-gray-800 text-center">{skid.dimensions}</td>
+                                <td className="py-3 px-1 font-semibold text-gray-800 text-right">{skid.weight.toLocaleString()}</td>
                             </tr>
                         ))}
                     </tbody>
                 </table>
-            </DetailCard>
+            </div>
+
         </div>
 
-        {/* RIGHT COLUMN GROUP */}
-        <div className="space-y-6">
+        {/* 3. RIGHT COLUMN GROUP: SCHEDULING AND ATTACHMENTS */}
+        <div className="flex flex-col space-y-6">
             
-            {/* Scheduling */}
-            <DetailCard title="Scheduling">
-                <div className="space-y-4 text-sm">
-                    <div className="flex justify-between items-center p-2 bg-gray-50 rounded-lg">
-                        <p className="font-normal text-gray-500 flex items-center"><Calendar className="w-4 h-4 mr-2" /> Pickup Deadline</p>
-                        <p className="text-text-red font-bold text-lg">{MOCK_SHIPMENT.scheduling.pickupDeadline}</p>
-                    </div>
-                    <div className="flex justify-between items-center p-2 bg-gray-50 rounded-lg">
-                        <p className="font-normal text-gray-500 flex items-center"><Calendar className="w-4 h-4 mr-2" /> Drop Off Deadline</p>
-                        <p className="text-text-red font-bold text-lg">{MOCK_SHIPMENT.scheduling.dropOffDeadline}</p>
-                    </div>
+            {/* Scheduling Card */}
+            <div className="bg-white p-6 rounded-xl shadow-md border border-gray-200">
+                <h2 className="text-lg font-bold text-gray-700 mb-4 flex items-center">
+                    <Clock className="w-5 h-5 mr-2 text-red-500" />
+                    Scheduling
+                </h2>
+                <div className="space-y-3">
+                    <DetailRow label="Pickup Deadline" value={MOCK_SHIPMENT.scheduling.pickupDeadline} />
+                    <DetailRow label="Drop Off Deadline" value={MOCK_SHIPMENT.scheduling.dropOffDeadline} />
                 </div>
-            </DetailCard>
-
-            {/* Attachments */}
-            <DetailCard title="Attachments">
-                <div className="space-y-4">
-                    {/* Shipper Documents (always displayed) */}
-                    <p className="font-bold text-gray-700">Shipper Documents:</p>
+            </div>
+            
+            {/* Attachments Card */}
+            <div className="bg-white p-6 rounded-xl shadow-md border border-gray-200 flex-grow">
+                <h2 className="text-lg font-bold text-gray-700 mb-4 flex items-center">
+                    <FileText className="w-5 h-5 mr-2 text-green-500" />
+                    Attachments
+                </h2>
+                
+                {/* Shipper Documents */}
+                <div className="mb-6">
+                    <p className="text-base font-semibold text-gray-700 mb-2">Shipper Documents:</p>
                     <div className="space-y-2">
                         {MOCK_SHIPMENT.shipperDocuments.map(doc => (
                             <DocumentRow key={doc.id} doc={doc} />
                         ))}
                     </div>
+                </div>
 
-                    {/* Carrier Documents */}
-                    <p className="font-bold text-gray-700 pt-4">Your Documents:</p>
+                {/* Carrier Documents */}
+                <div>
+                    <p className="text-base font-semibold text-gray-700 mb-2">Carrier Documents:</p>
                     <div className="space-y-2" id="carrier-document-list">
                         {carrierDocuments.map(doc => (
                             <DocumentRow 
@@ -393,37 +386,37 @@ const CarrierDetailView: React.FC = () => {
                         accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
                     />
                     <div 
-                        className="border-2 border-dashed border-gray-300 rounded-xl p-4 text-center cursor-pointer hover:bg-blue-50 transition mt-4 shadow-inner"
+                        className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:bg-blue-50 transition mt-4"
                         onClick={() => document.getElementById('carrier-file-upload')?.click()}
                     >
-                        <div className='flex items-center justify-center text-primary-blue font-semibold'>
-                            <Upload className="w-5 h-5 mr-2" />
+                        <div className='flex flex-col items-center justify-center text-blue-500 font-semibold'>
+                            <Upload className="w-5 h-5 mb-1" />
                             Click to upload or drag and drop (Max 10MB)
                         </div>
                     </div>
                 </div>
-            </DetailCard>
+            </div>
+        </div>
+        
+        {/* 4. SPECIAL NOTES (Full Width) */}
+        <div className="md:col-span-2">
+            <div className="bg-yellow-100 p-4 rounded-xl shadow-md border border-yellow-300">
+                <h2 className="text-lg font-bold text-gray-700 mb-2">Special Notes</h2>
+                <p className="text-base text-gray-700">{MOCK_SHIPMENT.notes}</p>
+            </div>
         </div>
       </div>
-
-
-      {/* SPECIAL NOTES (Full Width) */}
-      <DetailCard title="Special Notes" className="bg-accent-yellow border border-yellow-300">
-        <p className="text-sm text-gray-700">{MOCK_SHIPMENT.notes}</p>
-      </DetailCard>
       
-
-      {/* CONFIRMED BANNER / ACTIONS (Full Width) */}
-      <div className="flex flex-col md:flex-row justify-between items-center confirmed-box p-4 rounded-xl shadow-lg mt-6 border-2 border-primary-green">
-          <p className="text-lg font-bold text-primary-green mb-3 md:mb-0 flex items-center">
-              <Truck className="w-6 h-6 mr-2" />
-              You won this bid! Rate: <span className="text-2xl font-extrabold ml-2">$ {MOCK_SHIPMENT.awardedRate.toLocaleString()}</span>
+      {/* RATE CONFIRMED BANNER (Always at the very bottom) */}
+      <div className="mt-8 flex flex-col md:flex-row justify-between items-center bg-green-100 p-4 rounded-xl shadow-lg border-2 border-green-500">
+          <p className="text-xl font-bold text-green-700 mb-3 md:mb-0 flex items-center">
+              You won this bid! Rate: <span className="text-2xl font-extrabold ml-2">${MOCK_SHIPMENT.awardedRate.toLocaleString()}</span>
           </p>
           <div className="flex space-x-3 w-full md:w-auto justify-end">
-              <button className="flex-1 md:flex-none px-4 py-2 text-sm font-semibold text-text-red border border-text-red bg-white rounded-full hover:bg-red-50 transition shadow-sm">
+              <button className="flex-1 md:flex-none px-4 py-2 text-sm font-semibold text-red-600 border border-red-400 bg-white rounded-full hover:bg-red-50 transition shadow-sm">
                   Cancel Shipment
               </button>
-              <button className="flex-1 md:flex-none px-4 py-2 text-sm font-semibold text-white bg-primary-green rounded-full hover:bg-green-600 transition shadow-lg">
+              <button className="flex-1 md:flex-none px-4 py-2 text-sm font-semibold text-white bg-green-500 rounded-full hover:bg-green-600 transition shadow-lg">
                   Mark as Delivered
               </button>
           </div>
@@ -431,7 +424,7 @@ const CarrierDetailView: React.FC = () => {
       
       {/* Message Box for Toasts */}
       {message && (
-        <div className={`fixed bottom-4 right-4 z-50 p-4 rounded-lg shadow-xl text-white ${message.color} transition-opacity duration-300 ease-out animate-pulse`}>
+        <div className={`fixed bottom-4 right-4 z-50 p-3 rounded-lg shadow-xl text-white ${message.color} transition-opacity duration-300 ease-out`}>
             {message.text}
         </div>
       )}
@@ -441,15 +434,3 @@ const CarrierDetailView: React.FC = () => {
 };
 
 export default CarrierDetailView;
-
-// Custom colors and utility classes used in Tailwind setup:
-/*
-.info-card { background-color: white; border-radius: 8px; box-shadow: ...; border: 1px solid #e5e7eb; }
-.confirmed-box { background-color: #d1fae5; border: 2px solid #34d399; }
-.unsaved-box { background-color: #fefcbf; border: 2px solid #facc15; }
-.text-primary-blue: #3b82f6
-.text-primary-green: #34d399
-.text-primary-red: #ef4444
-.bg-update-purple: #5c63ec
-.bg-accent-yellow: #fef3c7
-*/
