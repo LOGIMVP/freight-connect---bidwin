@@ -105,6 +105,7 @@
 
         function renderShipmentDetails(shipment) {
             const app = document.getElementById('app');
+            // The entire page content, including the modal structure, is dynamically loaded here
             app.innerHTML = `
                 <div class="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
                     
@@ -292,8 +293,16 @@
         // --- MODAL AND ACTION LOGIC ---
 
         function openModal(action, title, message) {
+            console.log(`[Modal] Attempting to open modal for action: ${action}`);
             currentAction = action;
             const modal = document.getElementById('confirmation-modal');
+            
+            if (!modal) {
+                console.error("[Modal Error] Element 'confirmation-modal' not found.");
+                showMessage("Internal Error: Modal system missing.", "bg-primary-red");
+                return;
+            }
+            
             const confirmBtn = document.getElementById('modal-confirm-btn');
 
             document.getElementById('modal-title').innerText = title;
@@ -308,11 +317,12 @@
                 confirmBtn.innerText = 'Confirm Delivery';
             }
 
+            // This is the critical line to make it visible
             modal.classList.remove('hidden');
         }
 
         function closeModal() {
-            document.getElementById('confirmation-modal').classList.add('hidden');
+            document.getElementById('confirmation-modal')?.classList.add('hidden');
             currentAction = null;
         }
 
@@ -336,9 +346,11 @@
 
         function handleAction(action) {
             if (action === 'Mark as Delivered') {
-                openModal(action, 'Confirm Delivery', 'Are you sure you want to mark Load #${MOCK_SHIPMENT.loadId} as **Delivered**? This action will initiate the payment process.');
+                const message = `Are you sure you want to mark Load #${MOCK_SHIPMENT.loadId} as <strong>Delivered</strong>? This action will initiate the payment process.`;
+                openModal(action, 'Confirm Delivery', message);
             } else if (action === 'Cancel Shipment') {
-                openModal(action, 'Confirm Cancellation', 'Are you sure you want to **Cancel** Load #${MOCK_SHIPMENT.loadId}? This may result in penalties.');
+                const message = `Are you sure you want to <strong>Cancel</strong> Load #${MOCK_SHIPMENT.loadId}? This may result in penalties.`;
+                openModal(action, 'Confirm Cancellation', message);
             } else {
                 // Document actions (no confirmation modal needed)
                 let message = "";
@@ -364,6 +376,8 @@
 
         function showMessage(text, color) {
             const box = document.getElementById('message-box');
+            if (!box) return; // Safety check
+            
             const messageEl = document.createElement('div');
             messageEl.className = `p-4 rounded-lg shadow-xl text-white ${color} mb-2 transition-opacity duration-300 ease-out opacity-0`;
             messageEl.innerText = text;
