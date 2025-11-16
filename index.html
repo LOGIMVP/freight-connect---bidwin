@@ -33,6 +33,12 @@
             border-top: 2px solid #34d399;
             border-bottom: 2px solid #34d399;
         }
+        /* Styling for the unsaved changes banner */
+        .unsaved-box {
+            background-color: #fefcbf; /* yellow-100 */
+            border-top: 2px solid #facc15;
+            border-bottom: 2px solid #facc15;
+        }
         /* Specific styling for the 2-column specs layout */
         .spec-grid {
             display: grid;
@@ -53,6 +59,7 @@
                         'accent-yellow': '#fef3c7', /* yellow-100 for notes */
                         'text-blue': '#3b82f6',
                         'text-red': '#ef4444',
+                        'update-purple': '#5c63ec', /* Custom purple for "Update Changes" button */
                     }
                 }
             }
@@ -61,7 +68,7 @@
         // Mock Data for a confirmed shipment
         const MOCK_SHIPMENT = {
             loadId: "L-4839",
-            trackingLink: "https://cloud.samsara.com/load-details/L-4839", // Initial tracking link
+            trackingLink: "https://cloud.samsara.com/load-details/L-4839", 
             pickup: {
                 location: "123 Oilfield Way, Edmonton, AB, T5J 0K6",
                 contact: "Edmonton Supply",
@@ -89,23 +96,95 @@
             skids: [
                 { quantity: 9, dimensions: "40 x 40 x 40", weight: 1000 }
             ],
-            // Document structure for display
             documents: [
                 { name: "pickup_ref_54321.pdf", viewUrl: "#view", downloadUrl: "#download" }
             ],
-            awardedRate: 1100.00
+            carrierDocuments: [], // New array to track documents added by carrier
+            awardedRate: 1100.00,
+            notes: "Pickup by appointment only.",
         };
+        
+        // Global state variable to track unsaved changes
+        let hasUnsavedChanges = false;
         
         // Variable to hold the action when the modal is open
         let currentAction = null;
+        
+        // Keep track of the initial/last saved value of the tracking link
+        let initialTrackingLink = MOCK_SHIPMENT.trackingLink; 
+
 
         document.addEventListener('DOMContentLoaded', () => {
             renderShipmentDetails(MOCK_SHIPMENT);
+            updateUnsavedBanner(); // Initialize the banner state
         });
+
+        // --- STATE MANAGEMENT ---
+
+        function markDirty() {
+            if (!hasUnsavedChanges) {
+                hasUnsavedChanges = true;
+                updateUnsavedBanner();
+            }
+        }
+
+        function saveChanges() {
+            // In a real app, this would execute all API calls to save the tracking link and document list
+            showMessage("Saving all updates to tracking link and documents...", "bg-update-purple");
+            
+            // Simulate API latency
+            setTimeout(() => {
+                hasUnsavedChanges = false;
+                initialTrackingLink = MOCK_SHIPMENT.trackingLink; // Update the "initial" state
+                updateUnsavedBanner();
+                showMessage("Shipment details updated successfully.", "bg-primary-green");
+            }, 1000);
+        }
+
+        function updateUnsavedBanner() {
+            const container = document.getElementById('unsaved-changes-container');
+            if (container) {
+                container.innerHTML = hasUnsavedChanges ? `
+                    <div class="flex flex-col md:flex-row justify-between items-center unsaved-box p-4 rounded-lg shadow-md mt-6">
+                        <p class="text-lg font-bold text-gray-800 mb-3 md:mb-0 flex items-center">
+                            <svg class="w-6 h-6 mr-2 text-primary-red" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.394 17c-.77 1.333.192 3 1.732 3z"></path></svg>
+                            You have unsaved changes.
+                        </p>
+                        <button class="flex-1 md:flex-none px-6 py-2 text-sm font-semibold text-white bg-update-purple rounded-md hover:bg-indigo-600 transition shadow-lg" onclick="saveChanges()">
+                            Update Changes
+                        </button>
+                    </div>
+                ` : '';
+            }
+        }
+
+        // --- RENDER FUNCTION ---
 
         function renderShipmentDetails(shipment) {
             const app = document.getElementById('app');
-            // The entire page content, including the modal structure, is dynamically loaded here
+            
+            // Generate the shipper document list HTML
+            const shipperDocsHtml = shipment.documents.map(doc => `
+                <div class="flex items-center justify-between text-sm ml-7">
+                    <span class="truncate pr-2 text-gray-600">${doc.name}</span>
+                    <div class="flex space-x-2">
+                        <button class="px-3 py-1 text-xs text-text-blue border border-text-blue rounded-full hover:bg-blue-50 transition" onclick="handleDocumentAction('View', '${doc.name}')">View</button>
+                        <button class="px-3 py-1 text-xs text-white bg-text-blue rounded-full hover:bg-blue-600 transition" onclick="handleDocumentAction('Download', '${doc.name}')">Download</button>
+                    </div>
+                </div>
+            `).join('');
+
+             // Generate the carrier document list HTML
+            const carrierDocsHtml = shipment.carrierDocuments.map(doc => `
+                <div class="flex items-center justify-between text-sm ml-7 mt-2" id="doc-${doc.id}">
+                    <span class="truncate pr-2 text-gray-600">${doc.name}</span>
+                    <div class="flex space-x-2">
+                        <button class="px-3 py-1 text-xs text-text-blue border border-text-blue rounded-full hover:bg-blue-50 transition" onclick="handleDocumentAction('View', '${doc.name}')">View</button>
+                        <button class="px-3 py-1 text-xs text-white bg-primary-red rounded-full hover:bg-red-600 transition" onclick="removeCarrierDocument('${doc.id}', '${doc.name}')">Remove</button>
+                    </div>
+                </div>
+            `).join('');
+
             app.innerHTML = `
                 <div class="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
                     
@@ -118,7 +197,7 @@
                             <label for="tracking-link" class="font-semibold text-gray-700 mr-2 whitespace-nowrap">Tracking Link:</label>
                             <input type="url" id="tracking-link" value="${shipment.trackingLink}" placeholder="Paste your live tracking URL here"
                                 class="w-full md:w-80 p-1 border border-gray-300 rounded-md text-text-blue focus:ring-primary-blue focus:border-primary-blue text-xs truncate"
-                                onchange="saveTrackingLink(this.value)">
+                                oninput="handleTrackingLinkChange(this.value)">
                         </div>
                     </div>
 
@@ -221,16 +300,7 @@
                                         <svg class="w-5 h-5 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.414a1 1 0 00-1.414-1.414L10 11.586"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414l-1.414 1.414"></path></svg>
                                         Shipper Documents:
                                     </p>
-                                    ${shipment.documents.map(doc => `
-                                        <div class="flex items-center justify-between text-sm ml-7">
-                                            <span class="truncate pr-2 text-gray-600">${doc.name}</span>
-                                            <div class="flex space-x-2">
-                                                <!-- Calling handleDocumentAction for View/Download -->
-                                                <button class="px-3 py-1 text-xs text-text-blue border border-text-blue rounded-full hover:bg-blue-50 transition" onclick="handleDocumentAction('View', '${doc.name}')">View</button>
-                                                <button class="px-3 py-1 text-xs text-white bg-text-blue rounded-full hover:bg-blue-600 transition" onclick="handleDocumentAction('Download', '${doc.name}')">Download</button>
-                                            </div>
-                                        </div>
-                                    `).join('')}
+                                    ${shipperDocsHtml}
 
                                     <p class="font-normal text-gray-700 mt-4 flex items-center">
                                         <svg class="w-5 h-5 mr-2 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0l-4 4m4-4v12"></path></svg>
@@ -239,7 +309,7 @@
                                     
                                     <!-- Container for dynamically added documents -->
                                     <div id="carrier-document-list" class="space-y-2">
-                                        <!-- Documents uploaded by the carrier will appear here -->
+                                        ${carrierDocsHtml}
                                     </div>
 
                                     <!-- Hidden File Input (Triggered by click on drop-zone) -->
@@ -268,8 +338,13 @@
                     </div>
 
                     
+                    <!-- UNSAVED CHANGES BANNER CONTAINER (New Feature) -->
+                    <div id="unsaved-changes-container">
+                        <!-- Banner content is inserted here by JavaScript when changes occur -->
+                    </div>
+
                     <!-- CONFIRMED BANNER / ACTIONS (Full Width) -->
-                    <div class="flex flex-col md:flex-row justify-between items-center confirmed-box p-4 rounded-lg shadow-md">
+                    <div class="flex flex-col md:flex-row justify-between items-center confirmed-box p-4 rounded-lg shadow-md mt-6">
                         <p class="text-lg font-bold text-primary-green mb-3 md:mb-0">
                             You won this bid! Rate: <span class="text-2xl">$${shipment.awardedRate.toLocaleString()}</span>
                         </p>
@@ -307,6 +382,22 @@
             `;
         }
 
+        // --- TRACKING LINK HANDLING ---
+        function handleTrackingLinkChange(link) {
+            // Check if the link has changed from the initial/last saved value
+            if (link !== initialTrackingLink || MOCK_SHIPMENT.carrierDocuments.length > 0) {
+                markDirty();
+            } else if (link === initialTrackingLink && MOCK_SHIPMENT.carrierDocuments.length === 0) {
+                 // Logic to remove dirty state if user reverts link and no docs are pending
+                 hasUnsavedChanges = false;
+                 updateUnsavedBanner();
+            }
+
+            // Temporarily update the mock object value
+            MOCK_SHIPMENT.trackingLink = link;
+        }
+
+
         // --- FILE UPLOAD / DRAG AND DROP LOGIC ---
 
         function handleFileSelect(event) {
@@ -316,9 +407,13 @@
             }
         }
 
+        function generateUniqueId() {
+            // Simple unique ID for mock tracking
+            return 'doc-' + Date.now();
+        }
+
         function uploadFile(file) {
             if (file) {
-                // Simple file size check (e.g., max 10MB)
                 if (file.size > 10 * 1024 * 1024) {
                     showMessage(`File size exceeds 10MB limit: ${file.name}`, "bg-primary-red");
                     return;
@@ -329,32 +424,53 @@
 
                 // Simulate a successful upload after a short delay
                 setTimeout(() => {
+                    const docId = generateUniqueId();
+                    // Add to mock data (will be saved when 'Update Changes' is clicked)
+                    MOCK_SHIPMENT.carrierDocuments.push({ id: docId, name: file.name, temp: true });
+
                     const documentList = document.getElementById('carrier-document-list');
                     if (documentList) {
-                        // Create the HTML for the new document entry
                         const newDocHtml = `
-                            <div class="flex items-center justify-between text-sm ml-7 mt-2">
+                            <div class="flex items-center justify-between text-sm ml-7 mt-2" id="doc-${docId}">
                                 <span class="truncate pr-2 text-gray-600">${file.name}</span>
                                 <div class="flex space-x-2">
-                                    <!-- New uploaded documents are also clickable -->
                                     <button class="px-3 py-1 text-xs text-text-blue border border-text-blue rounded-full hover:bg-blue-50 transition" onclick="handleDocumentAction('View', '${file.name}')">View</button>
-                                    <button class="px-3 py-1 text-xs text-white bg-text-blue rounded-full hover:bg-blue-600 transition" onclick="handleDocumentAction('Download', '${file.name}')">Download</button>
+                                    <button class="px-3 py-1 text-xs text-white bg-primary-red rounded-full hover:bg-red-600 transition" onclick="removeCarrierDocument('${docId}', '${file.name}')">Remove</button>
                                 </div>
                             </div>
                         `;
-                        // Prepend the new document for visibility
                         documentList.innerHTML = newDocHtml + documentList.innerHTML;
                     }
-                    showMessage(`File uploaded successfully: ${file.name}`, "bg-primary-green");
+                    
+                    markDirty(); // Mark changes as unsaved
+                    showMessage(`Document added, click 'Update Changes' to save.`, "bg-accent-yellow text-gray-800");
+
                 }, 1500);
             }
         }
+        
+        function removeCarrierDocument(docId, fileName) {
+             // Remove from the mock data
+            MOCK_SHIPMENT.carrierDocuments = MOCK_SHIPMENT.carrierDocuments.filter(doc => doc.id !== docId);
+
+            // Remove from the DOM
+            document.getElementById(docId)?.remove();
+
+            // Check if any changes remain (just tracking link for simplicity)
+            if (MOCK_SHIPMENT.trackingLink === initialTrackingLink && MOCK_SHIPMENT.carrierDocuments.length === 0) {
+                 hasUnsavedChanges = false;
+                 updateUnsavedBanner();
+            } else {
+                 markDirty(); 
+            }
+            
+            showMessage(`Document marked for removal: ${fileName}. Click 'Update Changes' to save.`, "bg-accent-yellow text-gray-800");
+        }
 
         function handleDragOver(event) {
-            event.preventDefault(); // Necessary to allow drop
+            event.preventDefault(); 
             const dropzone = document.getElementById('drop-zone');
             if (dropzone) {
-                // Add visual feedback for drag-over
                 dropzone.classList.add('border-primary-blue', 'bg-blue-50', 'scale-[1.01]', 'shadow-inner');
             }
         }
@@ -363,14 +479,13 @@
             event.preventDefault();
             const dropzone = document.getElementById('drop-zone');
             if (dropzone) {
-                // Reset visual style
                 dropzone.classList.remove('border-primary-blue', 'bg-blue-50', 'scale-[1.01]', 'shadow-inner');
             }
         }
 
         function handleDrop(event) {
             event.preventDefault();
-            handleDragLeave(event); // Reset visual style
+            handleDragLeave(event); 
             
             if (event.dataTransfer.files.length > 0) {
                 uploadFile(event.dataTransfer.files[0]);
@@ -396,7 +511,6 @@
             document.getElementById('modal-title').innerText = title;
             document.getElementById('modal-message').innerHTML = message;
             
-            // Set button color and text based on action
             if (action === 'Cancel Shipment') {
                 confirmBtn.className = 'px-4 py-2 text-sm font-semibold text-white rounded-md transition bg-primary-red hover:bg-red-600';
                 confirmBtn.innerText = 'Confirm Cancel';
@@ -419,7 +533,6 @@
             let message = "";
             let bgColor = "bg-primary-blue";
 
-            // Process the confirmed action
             if (currentAction === 'Mark as Delivered') {
                 message = "Shipment successfully marked as Delivered! Awaiting final payment confirmation.";
                 bgColor = "bg-primary-green";
@@ -433,11 +546,11 @@
 
         function handleAction(action) {
             if (action === 'Mark as Delivered') {
-                // CORRECTED message for Delivery
+                // Corrected message for Delivery
                 const message = `Are you sure you want to mark this shipment as <strong>delivered</strong>?`;
                 openModal(action, 'Confirm Delivery', message);
             } else if (action === 'Cancel Shipment') {
-                // CORRECTED message for Cancellation
+                // Corrected message for Cancellation
                 const message = `Are you sure you want to <strong>cancel this shipment</strong>?`;
                 openModal(action, 'Confirm Cancellation', message);
             }
@@ -455,18 +568,11 @@
             showMessage(message, bgColor);
         }
 
-        function saveTrackingLink(link) {
-            // In a real application, this would save the link to a database
-            MOCK_SHIPMENT.trackingLink = link; // Update mock data
-            console.log("Tracking link updated (simulated save):", link);
-            showMessage("Tracking link updated.", "bg-gray-700");
-        }
-        
         // --- TOAST/MESSAGE BOX LOGIC ---
 
         function showMessage(text, color) {
             const box = document.getElementById('message-box');
-            if (!box) return; // Safety check
+            if (!box) return; 
             
             const messageEl = document.createElement('div');
             messageEl.className = `p-4 rounded-lg shadow-xl text-white ${color} mb-2 transition-opacity duration-300 ease-out opacity-0`;
