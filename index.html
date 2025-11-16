@@ -6,486 +6,281 @@
     <title>Detailed Shipment View</title>
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <!-- Load React and Babel for JSX in the browser -->
-    <script src="https://unpkg.com/react@18/umd/react.development.js"></script>
-    <script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"></script>
-    <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
     
     <script>
+        // Tailwind configuration for the "Inter" font
         tailwind.config = {
             theme: {
                 extend: {
                     fontFamily: {
                         sans: ['Inter', 'sans-serif'],
                     },
+                    colors: {
+                        'custom-green': '#34D399', // A nice vibrant green for actions
+                    }
                 },
             },
         }
     </script>
     
     <style>
+        /* General styling for the page */
         body {
             font-family: 'Inter', sans-serif;
             background-color: #f3f4f6;
         }
+        /* Custom class for the card shadows/look */
+        .info-card {
+            border: 1px solid #e5e7eb; /* Subtle border */
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1), 0 2px 4px -2px rgba(0, 0, 0, 0.06); /* Standard shadow */
+        }
     </style>
 </head>
-<body>
-    <div id="root"></div>
+<body class="p-4 md:p-8">
+    <div class="max-w-6xl mx-auto space-y-6">
 
-    <script type="text/babel">
-        const { useState, useCallback, useMemo } = React;
-        const { Truck, MapPin, Calendar, Scale, FileText, Upload, Trash2, Save, X, RotateCcw, Package, Clock, Link, Download } = lucide;
-
-        // --- MOCK DATA INTERFACES (Simulated) ---
-        // Note: Interfaces are comments here as Babel in the browser doesn't fully support TS interfaces.
-        // interface Document { id: string; name: string; url: string; type: 'shipper' | 'carrier'; isDeleted?: boolean; }
-        // interface Skid { quantity: number; dimensions: string; weight: number; }
-        // interface Shipment { ... }
-
-        // Mock initial data 
-        const MOCK_SHIPMENT = {
-            loadId: "L-4839",
-            trackingLink: "https://cloud.samsara.com/load-details/L-4839",
-            pickup: { location: "123 Oilfield Way, Edmonton, AB, T5J 0K6", contact: "Edmonton Supply", phone: "780-555-0500", stops: 1, contactPhone: "780-555-0500" },
-            delivery: { location: "789 Central Goods Rd, Winnipeg, MB, R3C 0B4", contact: "Central Logistics", email: "wpg.logistics@example.com", phone: "204-555-0700", stops: 1, contactPhone: "204-555-0700" },
-            specs: { equipment: "LTL", equipmentDetail: "(Dry Van)", totalWeight: "9,000 lbs", totalSkidQuantity: 9, estLinearFeet: "12.5 ft" },
-            scheduling: { pickupDeadline: "Nov 18, 2025", dropOffDeadline: "Nov 21, 2025" },
-            skids: [{ quantity: 9, dimensions: "40 x 40 x 40", weight: 1000 }],
-            shipperDocuments: [
-                { id: 'S-1', name: "pickup_ref_54321.pdf", url: "#", type: 'shipper' },
-            ],
-            awardedRate: 1100.00,
-            notes: "Pickup by appointment only.",
-        };
-
-        // --- Component Helper: DocumentRow ---
-        const DocumentRow = ({ doc, onStageRemove, onUndoRemove }) => {
-            const isCarrierDoc = doc.type === 'carrier';
-
-            const rowClasses = doc.isDeleted
-                ? "bg-red-50 border-l-4 border-red-500 opacity-90 transition duration-300 shadow-none"
-                : "bg-white hover:bg-gray-50 transition duration-150";
-
-            return (
-                <div className={`flex items-center justify-between text-sm p-2 rounded-lg ${rowClasses}`}>
-                    {/* Document Name */}
-                    <div className="flex items-center space-x-2 w-2/3 truncate">
-                        <FileText className="w-4 h-4 text-gray-500 flex-shrink-0" />
-                        <span
-                            className={`truncate font-medium text-gray-700 ${doc.isDeleted ? 'line-through text-gray-500 italic' : ''}`}
-                        >
-                            {doc.name}
-                            {doc.isDeleted && <span className="text-red-500 ml-2 text-xs font-bold">(Pending Removal)</span>}
-                        </span>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex space-x-2 flex-shrink-0">
-                        {/* View Button (Always available) */}
-                        <a
-                            href={doc.url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="px-3 py-1 text-xs text-blue-600 border border-blue-200 bg-white rounded-full hover:bg-blue-50 transition duration-150 font-semibold"
-                        >
-                            View
-                        </a>
-                        
-                        {/* Download Button (Only for Shipper Docs in this context) */}
-                        {doc.type === 'shipper' && (
-                            <button
-                                className="flex items-center px-3 py-1 text-xs text-white bg-gray-600 rounded-full hover:bg-gray-700 transition duration-150 shadow-sm font-semibold"
-                            >
-                                <Download className="w-3 h-3 mr-1" />
-                                DL
-                            </button>
-                        )}
-
-                        {/* Conditional Action Button (Remove or Undo) - Only for Carrier Documents */}
-                        {isCarrierDoc && onStageRemove && onUndoRemove && (
-                            doc.isDeleted ? (
-                                // UNDO Button
-                                <button
-                                    className="flex items-center px-3 py-1 text-xs text-white bg-green-500 rounded-full hover:bg-green-600 transition duration-150 shadow-sm font-semibold"
-                                    onClick={() => onUndoRemove(doc.id)}
-                                >
-                                    <RotateCcw className="w-3 h-3 mr-1" />
-                                    Undo
-                                </button>
-                            ) : (
-                                // REMOVE Button
-                                <button
-                                    className="flex items-center px-3 py-1 text-xs text-white bg-red-500 rounded-full hover:bg-red-600 transition duration-150 shadow-sm font-semibold"
-                                    onClick={() => onStageRemove(doc.id)}
-                                >
-                                    <Trash2 className="w-3 h-3 mr-1" />
-                                    Remove
-                                </button>
-                            )
-                        )}
-                    </div>
-                </div>
-            );
-        };
-
-
-        // --- Main Component ---
-        const CarrierDetailView = () => {
-            const [trackingLink, setTrackingLink] = useState(MOCK_SHIPMENT.trackingLink);
-            const [carrierDocuments, setCarrierDocuments] = useState([]);
-
-            const initialTrackingLink = MOCK_SHIPMENT.trackingLink;
-            const [message, setMessage] = useState(null);
-
-            const showMessage = useCallback((text, color) => {
-                setMessage({ text, color });
-                setTimeout(() => setMessage(null), 5000);
-            }, []);
-
-            // Check if link or any document is newly added or marked for deletion
-            const hasUnsavedChanges = useMemo(() => {
-                const linkChanged = trackingLink !== initialTrackingLink;
-                // Check if any document has 'isDeleted' flag or is a newly created mock document
-                const documentsChanged = carrierDocuments.some(doc => doc.isDeleted || doc.id.startsWith('new-carrier-doc-'));
-                return linkChanged || documentsChanged;
-            }, [trackingLink, initialTrackingLink, carrierDocuments]);
-
-            // --- HANDLERS ---
-
-            const handleTrackingLinkChange = useCallback((e) => {
-                setTrackingLink(e.target.value);
-            }, []);
-
-            const handleFileUpload = useCallback((e) => {
-                const file = e.target.files?.[0];
-                if (file) {
-                    if (file.size > 10 * 1024 * 1024) {
-                        showMessage(`File size exceeds 10MB limit: ${file.name}`, "bg-red-500");
-                        return;
-                    }
-
-                    showMessage(`Uploading file: ${file.name} (simulated)...`, "bg-blue-500");
-
-                    setTimeout(() => {
-                        const newDoc = {
-                            id: `new-carrier-doc-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
-                            name: file.name,
-                            url: '#',
-                            type: 'carrier',
-                        };
-
-                        setCarrierDocuments(prevDocs => [...prevDocs, newDoc]);
-
-                        e.target.value = '';
-
-                        showMessage(`Document added. Ready to save.`, "bg-yellow-400 text-gray-800");
-
-                    }, 1500);
-                }
-            }, [showMessage]);
-
-            const handleStageRemove = useCallback((docId) => {
-                setCarrierDocuments(prevDocs =>
-                    prevDocs.map(doc => doc.id === docId ? { ...doc, isDeleted: true } : doc)
-                );
-                showMessage(`Document marked for removal. Click 'Undo' to revert or 'Update Changes' to finalize.`, "bg-yellow-400 text-gray-800");
-            }, [showMessage]);
-
-            const handleUndoRemove = useCallback((docId) => {
-                setCarrierDocuments(prevDocs =>
-                    prevDocs.map(doc => doc.id === docId ? { ...doc, isDeleted: false } : doc)
-                );
-                showMessage(`Removal successfully undone.`, "bg-green-500");
-            }, [showMessage]);
-
-            const handleSaveChanges = useCallback(() => {
-                showMessage("Saving all updates to tracking link and documents...", "bg-indigo-600");
-
-                // 1. Filter out documents marked for deletion (simulated API call)
-                const savedDocs = carrierDocuments.filter(doc => !doc.isDeleted);
-                
-                setTimeout(() => {
-                    // 2. Reset the state, clearing the temporary 'new-carrier-doc' ID prefixes and 'isDeleted' flags
-                    const finalizedDocs = savedDocs.map(doc => ({ 
-                        ...doc, 
-                        isDeleted: undefined, 
-                        id: doc.id.startsWith('new-carrier-doc-') ? `saved-doc-${Date.now()}-${Math.floor(Math.random() * 1000)}` : doc.id
-                    }));
-                    setCarrierDocuments(finalizedDocs);
-                    
-                    // 3. Update the initial link state to match the new saved link
-                    // This is where you would update the backend database for the tracking link
-                    // setInitialTrackingLink(trackingLink); 
-
-                    showMessage("Shipment details updated successfully.", "bg-green-500");
-                }, 1500);
-            }, [carrierDocuments, trackingLink, showMessage]);
-
-
-            // Helper component for Stop Card content
-            const StopCard = ({ type, data }) => {
-                const isPickup = type === 'Pickup';
-                const color = isPickup ? 'text-blue-600' : 'text-purple-600';
-                const phone = data.contactPhone || data.phone;
-                
-                return (
-                    <div className="bg-white p-6 rounded-xl shadow-md border border-gray-200 h-full flex flex-col justify-between">
-                        <div>
-                            <h2 className="text-base font-semibold text-gray-700 mb-2">
-                                {type} Stops ({data.stops}):
-                            </h2>
-                            <div className="space-y-1">
-                                <p className="font-semibold text-gray-800">{data.location}</p>
-                                <p className="text-gray-600 text-sm">Contact: {data.contact}</p>
-                                
-                                {/* Delivery-specific fields */}
-                                {!isPickup && data.email && (
-                                    <p className="text-gray-600 text-sm">Email: {data.email}</p>
-                                )}
-                            </div>
-                        </div>
-                        {/* Phone link aligned to the bottom right */}
-                        <div className="pt-3 text-right">
-                            <a href={`tel:${phone.replace(/-/g, '')}`} className={`text-sm font-bold ${color} hover:underline`}>
-                                {phone}
-                            </a>
-                        </div>
-                    </div>
-                );
-            };
+        <!-- HEADER ROW: TITLE AND LIVE TRACKING INPUT -->
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-4 space-y-2 sm:space-y-0">
+            <h1 class="text-2xl font-extrabold text-gray-800 whitespace-nowrap">
+                Detailed Shipment Information
+            </h1>
             
-            // Helper for inner detail rows (Specs)
-            const DetailRow = ({ label, value, detail, valueColor }) => (
-                <div className="flex justify-between items-center py-3 border-b border-gray-100 last:border-b-0">
-                    <p className="text-sm text-gray-500">{label}</p>
-                    <div className="text-right">
-                        <p className={`font-bold text-base ${valueColor || 'text-gray-800'}`}>{value}</p>
-                        {detail && <p className="text-xs text-gray-500">{detail}</p>}
+            <!-- TRACKING LINK INPUT FIELD -->
+            <div class="flex flex-col sm:flex-row items-start sm:items-center text-sm w-full sm:w-auto">
+                <label for="tracking-link" class="font-semibold text-gray-700 mr-2 whitespace-nowrap">Live Tracking Link:</label>
+                <input 
+                    type="url" 
+                    id="tracking-link" 
+                    value="https://cloud.samsara.com/load-details/L-4839"
+                    placeholder="https://cloud.samsara.com/..."
+                    class="w-full sm:w-64 p-1 border border-gray-300 rounded-md text-sm text-blue-600 focus:ring-blue-500 focus:border-blue-500 truncate transition duration-150 shadow-inner"
+                />
+            </div>
+        </div>
+
+        <!-- UNSAVED CHANGES BANNER (Static Example) -->
+        <!-- This is purely for static display now. In a real app, this would be dynamically shown/hidden by JS -->
+        <div class="flex flex-col md:flex-row justify-between items-center bg-indigo-100 p-4 rounded-xl shadow-lg border border-indigo-300 transition duration-300 hidden">
+            <p class="text-base font-semibold text-indigo-800 mb-3 md:mb-0 flex items-center">
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 mr-2 text-red-500"><path d="M18 6L6 18"/><path d="M6 6L18 18"/></svg>
+                You have unsaved changes.
+            </p>
+            <button 
+                class="flex-1 md:flex-none px-6 py-2 text-sm font-bold text-white bg-indigo-600 rounded-full hover:bg-indigo-700 transition shadow-lg flex items-center justify-center" 
+                onclick="alert('Save Changes clicked!')"
+            >
+                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 mr-2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                Update Changes
+            </button>
+        </div>
+
+
+        <!-- --- MAIN GRID LAYOUT --- -->
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+
+            <!-- STOPS ROW (Uses full width but is internally a grid-cols-2) -->
+            <div class="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-6">
+                <!-- Pickup Card -->
+                <div class="bg-white p-6 rounded-xl info-card h-full flex flex-col justify-between">
+                    <div>
+                        <h2 class="text-base font-semibold text-gray-700 mb-3">Pickup Stops (1):</h2>
+                        <div class="space-y-1">
+                            <p class="font-semibold text-gray-800">123 Oilfield Way, Edmonton, AB, T5J 0K6</p>
+                            <p class="text-gray-600 text-sm">Contact: Edmonton Supply</p>
+                        </div>
+                    </div>
+                    <div class="pt-3 text-right">
+                        <a href="tel:7805550500" class="text-sm font-bold text-blue-600 hover:underline">
+                            780-555-0500
+                        </a>
                     </div>
                 </div>
-            );
 
-            // Combine shipper and carrier documents for display
-            const allDocuments = useMemo(() => [
-                ...MOCK_SHIPMENT.shipperDocuments,
-                ...carrierDocuments.filter(doc => !doc.isDeleted),
-                ...carrierDocuments.filter(doc => doc.isDeleted) // Put pending removals at the end
-            ], [carrierDocuments]);
-
-
-            return (
-                <div className="p-4 md:p-8 max-w-6xl mx-auto space-y-6 bg-gray-50 min-h-screen">
-                    
-                    {/* HEADER ROW: TITLE AND LIVE TRACKING INPUT */}
-                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center pb-4 space-y-2 sm:space-y-0">
-                        <h1 className="text-2xl font-extrabold text-gray-800 whitespace-nowrap">
-                            Detailed Shipment Information
-                        </h1>
-                        
-                        {/* TRACKING LINK INPUT FIELD */}
-                        <div className="flex flex-col sm:flex-row items-start sm:items-center text-sm w-full sm:w-auto">
-                            <label htmlFor="tracking-link" className="font-semibold text-gray-700 mr-2 whitespace-nowrap">Tracking Link:</label>
-                            <input 
-                                type="url" 
-                                id="tracking-link" 
-                                value={trackingLink} 
-                                onChange={handleTrackingLinkChange}
-                                placeholder="https://cloud.samsara.com/..."
-                                className="w-full sm:w-64 p-1 border border-gray-300 rounded-md text-sm text-blue-600 focus:ring-blue-500 focus:border-blue-500 truncate transition duration-150 shadow-inner"
-                            />
+                <!-- Delivery Card -->
+                <div class="bg-white p-6 rounded-xl info-card h-full flex flex-col justify-between">
+                    <div>
+                        <h2 class="text-base font-semibold text-gray-700 mb-3">Delivery Stops (1):</h2>
+                        <div class="space-y-1">
+                            <p class="font-semibold text-gray-800">789 Central Goods Rd, Winnipeg, MB, R3C 0B4</p>
+                            <p class="text-gray-600 text-sm">Contact: Central Logistics</p>
+                            <p class="text-gray-600 text-sm">Email: wpg.logistics@example.com</p>
                         </div>
                     </div>
-                    
-                    {/* UNSAVED CHANGES BANNER CONTAINER */}
-                    {hasUnsavedChanges && (
-                        <div className="flex flex-col md:flex-row justify-between items-center bg-indigo-50 p-4 rounded-xl shadow-lg border border-indigo-300 transition duration-300">
-                            <p className="text-base font-semibold text-indigo-800 mb-3 md:mb-0 flex items-center">
-                                <X className="w-5 h-5 mr-2 text-red-500" />
-                                You have unsaved changes.
-                            </p>
-                            <button 
-                                className="flex-1 md:flex-none px-6 py-2 text-sm font-bold text-white bg-indigo-600 rounded-full hover:bg-indigo-700 transition shadow-lg disabled:opacity-50 flex items-center justify-center" 
-                                onClick={handleSaveChanges}
-                                disabled={!hasUnsavedChanges}
-                            >
-                                <Save className="w-4 h-4 mr-2" />
-                                Update Changes
-                            </button>
-                        </div>
-                    )}
-
-                    {/* --- MAIN GRID LAYOUT --- */}
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-
-                        {/* 1. STOPS ROW (Uses full width but is internally a grid-cols-2) */}
-                        <div className="md:col-span-2 grid grid-cols-1 sm:grid-cols-2 gap-6">
-                            <StopCard type="Pickup" data={MOCK_SHIPMENT.pickup} />
-                            <StopCard type="Delivery" data={MOCK_SHIPMENT.delivery} />
-                        </div>
-
-                        {/* 2. LEFT COLUMN GROUP: SPECS AND SKIDS */}
-                        <div className="flex flex-col space-y-6">
-                            
-                            {/* Shipment Specifications Card */}
-                            <div className="bg-white p-6 rounded-xl shadow-md border border-gray-200">
-                                <h2 className="text-lg font-bold text-gray-700 mb-4 flex items-center">
-                                    <Scale className="w-5 h-5 mr-2 text-gray-500" />
-                                    Shipment Specifications
-                                </h2>
-                                <div className="space-y-1 divide-y divide-gray-100">
-                                    <DetailRow label="Equipment" value={MOCK_SHIPMENT.specs.equipment} detail={MOCK_SHIPMENT.specs.equipmentDetail} />
-                                    <DetailRow label="Total Weight" value={MOCK_SHIPMENT.specs.totalWeight} />
-                                    <DetailRow label="Total Skid Quantity" value={MOCK_SHIPMENT.specs.totalSkidQuantity.toString()} />
-                                    <DetailRow label="Est. Linear Feet" value={MOCK_SHIPMENT.specs.estLinearFeet} />
-                                </div>
-                            </div>
-                            
-                            {/* Skid Details Card */}
-                            <div className="bg-white p-6 rounded-xl shadow-md border border-gray-200">
-                                <h2 className="text-lg font-bold text-gray-700 mb-4 flex items-center">
-                                    <Package className="w-5 h-5 mr-2 text-gray-500" />
-                                    Skid Details
-                                </h2>
-                                <table className="w-full text-sm text-gray-700">
-                                    <thead className="text-xs text-gray-600 uppercase bg-gray-50 rounded-t-lg">
-                                        <tr>
-                                            <th scope="col" className="py-2 px-1 text-left font-medium rounded-tl-lg">Quantity</th>
-                                            <th scope="col" className="py-2 text-center font-medium">Dimensions (L×W×H IN)</th>
-                                            <th scope="col" className="py-2 px-1 text-right font-medium rounded-tr-lg">Weight per Skid (LBS)</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {MOCK_SHIPMENT.skids.map((skid, index) => (
-                                            <tr key={index} className="bg-white border-b last:border-b-0">
-                                                <td className="py-3 px-1 font-bold text-gray-800 text-left">{skid.quantity}</td>
-                                                <td className="py-3 font-bold text-gray-800 text-center">{skid.dimensions}</td>
-                                                <td className="py-3 px-1 font-bold text-gray-800 text-right">{skid.weight.toLocaleString()}</td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-
-                        </div>
-
-                        {/* 3. RIGHT COLUMN GROUP: SCHEDULING AND ATTACHMENTS */}
-                        <div className="flex flex-col space-y-6">
-                            
-                            {/* Scheduling Card */}
-                            <div className="bg-white p-6 rounded-xl shadow-md border border-gray-200">
-                                <h2 className="text-lg font-bold text-gray-700 mb-4 flex items-center">
-                                    <Clock className="w-5 h-5 mr-2 text-red-500" />
-                                    Scheduling
-                                </h2>
-                                <div className="space-y-3 divide-y divide-gray-100">
-                                    <DetailRow 
-                                        label="Pickup Deadline" 
-                                        value={MOCK_SHIPMENT.scheduling.pickupDeadline} 
-                                        valueColor="text-red-600"
-                                    />
-                                    <DetailRow 
-                                        label="Drop Off Deadline" 
-                                        value={MOCK_SHIPMENT.scheduling.dropOffDeadline} 
-                                        valueColor="text-red-600"
-                                    />
-                                </div>
-                            </div>
-                            
-                            {/* Attachments Card */}
-                            <div className="bg-white p-6 rounded-xl shadow-md border border-gray-200 flex-grow">
-                                <h2 className="text-lg font-bold text-gray-700 mb-4 flex items-center">
-                                    <FileText className="w-5 h-5 mr-2 text-green-500" />
-                                    Attachments
-                                </h2>
-                                
-                                {/* Document Sections */}
-                                <div className="space-y-4">
-                                    <div>
-                                        <p className="text-base font-semibold text-gray-700 mb-2">Shipper Documents:</p>
-                                        <div className="space-y-2">
-                                            {/* Filter only non-deleted shipper docs */}
-                                            {MOCK_SHIPMENT.shipperDocuments
-                                                .filter(doc => !doc.isDeleted)
-                                                .map(doc => (
-                                                <DocumentRow key={doc.id} doc={doc} />
-                                            ))}
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <p className="text-base font-semibold text-gray-700 mb-2 mt-4">Carrier Documents:</p>
-                                        <div className="space-y-2" id="carrier-document-list">
-                                            {allDocuments.filter(doc => doc.type === 'carrier').map(doc => (
-                                                <DocumentRow 
-                                                    key={doc.id} 
-                                                    doc={doc} 
-                                                    onStageRemove={handleStageRemove} 
-                                                    onUndoRemove={handleUndoRemove}
-                                                />
-                                            ))}
-                                        </div>
-
-                                        {/* File Upload/Drop Zone */}
-                                        <input 
-                                            type="file" 
-                                            id="carrier-file-upload" 
-                                            className="hidden" 
-                                            onChange={handleFileUpload}
-                                            accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
-                                        />
-                                        <div 
-                                            className="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:bg-blue-50 transition mt-4"
-                                            onClick={() => document.getElementById('carrier-file-upload')?.click()}
-                                        >
-                                            <div className='flex flex-col items-center justify-center text-blue-500 font-semibold'>
-                                                <Upload className="w-5 h-5 mb-1" />
-                                                Click to upload or drag and drop (Max 10MB)
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                        
-                        {/* 4. SPECIAL NOTES (Full Width) */}
-                        <div className="md:col-span-2">
-                            <div className="bg-yellow-100 p-4 rounded-xl shadow-md border border-yellow-300">
-                                <h2 className="text-lg font-bold text-gray-700 mb-2">Special Notes</h2>
-                                <p className="text-base text-gray-700">{MOCK_SHIPMENT.notes}</p>
-                            </div>
-                        </div>
+                    <div class="pt-3 text-right">
+                        <a href="tel:2045550700" class="text-sm font-bold text-purple-600 hover:underline">
+                            204-555-0700
+                        </a>
                     </div>
-                    
-                    {/* RATE CONFIRMED BANNER (Always at the very bottom) */}
-                    <div className="mt-8 flex flex-col md:flex-row justify-between items-center bg-green-100 p-4 rounded-xl shadow-lg border-2 border-green-500">
-                        <p className="text-xl font-bold text-green-700 mb-3 md:mb-0 flex items-center">
-                            You won this bid! Rate: <span className="text-2xl font-extrabold ml-2">${MOCK_SHIPMENT.awardedRate.toLocaleString()}</span>
-                        </p>
-                        <div className="flex space-x-3 w-full md:w-auto justify-end">
-                            <button className="flex-1 md:flex-none px-4 py-2 text-sm font-semibold text-red-600 border border-red-400 bg-white rounded-full hover:bg-red-50 transition shadow-sm">
-                                Cancel Shipment
-                            </button>
-                            <button className="flex-1 md:flex-none px-4 py-2 text-sm font-semibold text-white bg-green-500 rounded-full hover:bg-green-600 transition shadow-lg">
-                                Mark as Delivered
-                            </button>
-                        </div>
-                    </div>
-                    
-                    {/* Message Box for Toasts */}
-                    {message && (
-                        <div className={`fixed bottom-4 right-4 z-50 p-3 rounded-xl shadow-xl text-white ${message.color} transition-opacity duration-300 ease-out font-medium`}>
-                            {message.text}
-                        </div>
-                    )}
-
                 </div>
-            );
-        };
+            </div>
 
-        // Render the component
-        const root = ReactDOM.createRoot(document.getElementById('root'));
-        root.render(React.createElement(CarrierDetailView));
-    </script>
+            <!-- LEFT COLUMN: SPECS AND SKIDS -->
+            <div class="flex flex-col space-y-6">
+                
+                <!-- Shipment Specifications Card -->
+                <div class="bg-white p-6 rounded-xl info-card">
+                    <h2 class="text-lg font-bold text-gray-700 mb-4">Shipment Specifications</h2>
+                    <div class="grid grid-cols-2 gap-x-4 gap-y-3 border-y border-gray-100 py-3">
+                        
+                        <!-- LTL/Dry Van -->
+                        <div class="text-sm text-gray-500">Equipment</div>
+                        <div class="text-right">
+                            <p class="font-bold text-base text-gray-800">LTL</p>
+                            <p class="text-xs text-gray-500">(Dry Van)</p>
+                        </div>
+
+                        <!-- Weight -->
+                        <div class="text-sm text-gray-500">Total Weight</div>
+                        <div class="text-right">
+                            <p class="font-bold text-base text-gray-800">9,000 lbs</p>
+                        </div>
+                        
+                        <!-- Skid Quantity -->
+                        <div class="text-sm text-gray-500">Total Skid Quantity</div>
+                        <div class="text-right">
+                            <p class="font-bold text-base text-gray-800">9</p>
+                        </div>
+
+                        <!-- Linear Feet -->
+                        <div class="text-sm text-gray-500">Est. Linear Feet</div>
+                        <div class="text-right">
+                            <p class="font-bold text-base text-gray-800">12.5 ft</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Skid Details Card -->
+                <div class="bg-white p-6 rounded-xl info-card">
+                    <h2 class="text-lg font-bold text-gray-700 mb-4">Skid Details</h2>
+                    <table class="w-full text-sm text-gray-700">
+                        <thead class="text-xs text-gray-600 uppercase bg-gray-50 rounded-t-lg">
+                            <tr>
+                                <th scope="col" class="py-2 px-1 text-left font-medium rounded-tl-lg">Quantity</th>
+                                <th scope="col" class="py-2 text-center font-medium">Dimensions (L×W×H IN)</th>
+                                <th scope="col" class="py-2 px-1 text-right font-medium rounded-tr-lg">Weight per Skid (LBS)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr class="bg-white border-b last:border-b-0">
+                                <td class="py-3 px-1 font-bold text-gray-800 text-left">9</td>
+                                <td class="py-3 font-bold text-gray-800 text-center">40 x 40 x 40</td>
+                                <td class="py-3 px-1 font-bold text-gray-800 text-right">1,000</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                </div>
+
+            </div>
+
+            <!-- RIGHT COLUMN: SCHEDULING AND ATTACHMENTS -->
+            <div class="flex flex-col space-y-6">
+                
+                <!-- Scheduling Card -->
+                <div class="bg-white p-6 rounded-xl info-card">
+                    <h2 class="text-lg font-bold text-gray-700 mb-4">Scheduling</h2>
+                    <div class="space-y-3 divide-y divide-gray-100">
+                        <!-- Pickup Deadline -->
+                        <div class="flex justify-between items-center py-3 border-b border-gray-100">
+                            <p class="text-sm text-gray-500">Pickup Deadline</p>
+                            <p class="font-bold text-base text-red-600">Nov 18, 2025</p>
+                        </div>
+                        <!-- Drop Off Deadline -->
+                        <div class="flex justify-between items-center py-3 last:border-b-0">
+                            <p class="text-sm text-gray-500">Drop Off Deadline</p>
+                            <p class="font-bold text-base text-red-600">Nov 21, 2025</p>
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Attachments Card -->
+                <div class="bg-white p-6 rounded-xl info-card flex-grow">
+                    <h2 class="text-lg font-bold text-gray-700 mb-4">Attachments</h2>
+                    
+                    <div class="space-y-4">
+                        <!-- Shipper Documents Section -->
+                        <div>
+                            <p class="text-base font-semibold text-gray-700 mb-2">Shipper Documents:</p>
+                            <div class="flex items-center justify-between text-sm p-2 rounded-lg bg-white">
+                                <div class="flex items-center space-x-2 w-2/3 truncate">
+                                    <!-- Simple File Icon SVG -->
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-gray-500 flex-shrink-0"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+                                    <span class="truncate font-medium text-gray-700">pickup_ref_54321.pdf</span>
+                                </div>
+                                <div class="flex space-x-2 flex-shrink-0">
+                                    <button class="px-3 py-1 text-xs text-blue-600 border border-blue-200 bg-white rounded-full hover:bg-blue-50 transition duration-150 font-semibold" onclick="alert('Viewing document...')">
+                                        View
+                                    </button>
+                                    <button class="flex items-center px-3 py-1 text-xs text-white bg-gray-600 rounded-full hover:bg-gray-700 transition duration-150 shadow-sm font-semibold" onclick="alert('Downloading document...')">
+                                        DL
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Carrier Documents Section -->
+                        <div>
+                            <p class="text-base font-semibold text-gray-700 mb-2 mt-4">Carrier Documents:</p>
+                            
+                            <!-- Static Example of a Carrier Document -->
+                            <div class="flex items-center justify-between text-sm p-2 rounded-lg bg-white">
+                                <div class="flex items-center space-x-2 w-2/3 truncate">
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-gray-500 flex-shrink-0"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
+                                    <span class="truncate font-medium text-gray-700">loading_invoice_L4839.pdf</span>
+                                </div>
+                                <div class="flex space-x-2 flex-shrink-0">
+                                    <button class="px-3 py-1 text-xs text-blue-600 border border-blue-200 bg-white rounded-full hover:bg-blue-50 transition duration-150 font-semibold" onclick="alert('Viewing Carrier document...')">
+                                        View
+                                    </button>
+                                    <button class="flex items-center px-3 py-1 text-xs text-white bg-red-500 rounded-full hover:bg-red-600 transition duration-150 shadow-sm font-semibold" onclick="alert('Remove document clicked!')">
+                                        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-3 h-3 mr-1"><path d="M3 6h18"/><path d="M19 6v14c0 1-1 2-2 2H7c-1 0-2-1-2-2V6"/><path d="M8 6V4c0-1 1-2 2-2h4c1 0 2 1 2 2v2"/></svg>
+                                        Remove
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- File Upload/Drop Zone (Static Example) -->
+                            <div class="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:bg-blue-50 transition mt-4" onclick="alert('File upload placeholder clicked!')">
+                                <div class='flex flex-col items-center justify-center text-blue-500 font-semibold'>
+                                    <!-- Upload Icon SVG -->
+                                    <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-5 h-5 mb-1"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+                                    Click to upload or drag and drop (Max 10MB)
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            
+            <!-- SPECIAL NOTES (Full Width) -->
+            <div class="md:col-span-2">
+                <div class="bg-yellow-100 p-4 rounded-xl info-card border-yellow-300">
+                    <h2 class="text-lg font-bold text-gray-700 mb-2">Special Notes</h2>
+                    <p class="text-base text-gray-700">Pickup by appointment only.</p>
+                </div>
+            </div>
+        </div>
+        
+        <!-- RATE CONFIRMED BANNER (Always at the very bottom) -->
+        <div class="mt-8 flex flex-col md:flex-row justify-between items-center bg-custom-green/20 p-4 rounded-xl shadow-lg border-2 border-custom-green">
+            <p class="text-xl font-bold text-green-800 mb-3 md:mb-0 flex items-center">
+                You won this bid! Rate: <span class="text-2xl font-extrabold ml-2">$1,100</span>
+            </p>
+            <div class="flex space-x-3 w-full md:w-auto justify-end">
+                <button class="flex-1 md:flex-none px-4 py-2 text-sm font-semibold text-red-600 border border-red-400 bg-white rounded-full hover:bg-red-50 transition shadow-sm" onclick="alert('Cancel Shipment clicked!')">
+                    Cancel Shipment
+                </button>
+                <button class="flex-1 md:flex-none px-4 py-2 text-sm font-semibold text-white bg-green-500 rounded-full hover:bg-green-600 transition shadow-lg" onclick="alert('Mark as Delivered clicked!')">
+                    Mark as Delivered
+                </button>
+            </div>
+        </div>
+        
+        <!-- Message Box Placeholder -->
+        <!-- In a static file, this acts as a visual placeholder for the toast message -->
+        <div class="fixed bottom-4 right-4 z-50 p-3 rounded-xl shadow-xl text-gray-800 bg-yellow-300/90 font-medium text-sm hidden">
+            Document marked for removal. Click 'Update Changes' to save.
+        </div>
+
+    </div>
 </body>
 </html>
