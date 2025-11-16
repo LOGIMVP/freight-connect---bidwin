@@ -1,20 +1,309 @@
-<!DOCTYPE html PUBLIC "-//W3C//DTD HTML 4.01//EN" "http://www.w3.org/TR/html4/strict.dtd">
-<html>
+<!DOCTYPE html>
+<html lang="en">
 <head>
-  <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
-  <meta http-equiv="Content-Style-Type" content="text/css">
-  <title></title>
-  <meta name="Generator" content="Cocoa HTML Writer">
-  <meta name="CocoaVersion" content="2575.7">
-  <style type="text/css">
-    p.p1 {margin: 0.0px 0.0px 0.0px 0.0px; font: 14.0px Menlo; color: #3874c0; -webkit-text-stroke: #3874c0; background-color: #121313}
-    span.s1 {font-kerning: none}
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Freight Connect Confirmed Load View</title>
+    <!-- Load Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        /* Custom styles for readability and spacing */
+        body {
+            font-family: 'Inter', sans-serif;
+            background-color: #f7f9fb;
+        }
+        .info-card {
+            background-color: white;
+            border-radius: 12px;
+            box-shadow: 0 4px 6px -1px rgb(0 0 0 / 0.1), 0 2px 4px -2px rgb(0 0 0 / 0.05);
+        }
+        .section-header {
+            border-bottom: 2px solid #3b82f6;
+            padding-bottom: 8px;
+            margin-bottom: 16px;
+            color: #1f2937;
+            font-weight: 700;
+        }
+        .detail-item {
+            padding: 4px 0;
+        }
+        .bid-box {
+            background-color: #e5f1ff;
+            border: 1px solid #93c5fd;
+        }
+        .confirmed-box {
+            background-color: #d1fae5;
+            border: 1px solid #34d399;
+        }
+    </style>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        'primary-blue': '#3b82f6',
+                        'primary-green': '#34d399',
+                        'primary-red': '#ef4444',
+                    }
+                }
+            }
+        }
+
+        // Mock Data for the shipment, which would normally come from a database
+        const MOCK_SHIPMENT = {
+            loadId: "L-4839",
+            pickup: {
+                location: "123 Oilfield Way, Edmonton, AB, T5J 0K6",
+                contact: "Edmonton Supply",
+                phone: "780-555-0500",
+                stops: 1,
+            },
+            delivery: {
+                location: "789 Central Goods Rd, Winnipeg, MB, R3C 0B4",
+                contact: "Central Logistics",
+                email: "wpg.logistics@example.com",
+                phone: "204-555-0700",
+                stops: 1,
+            },
+            specs: {
+                equipment: "LTL (Dry Van)",
+                totalWeight: "9,000 lbs",
+                totalSkidQuantity: 9,
+                estLinearFeet: "12.5 ft",
+            },
+            scheduling: {
+                pickupDeadline: "Nov 20, 2025",
+                dropOffDeadline: "Nov 23, 2025",
+            },
+            skids: [
+                { quantity: 9, dimensions: "40 x 40 x 40", weight: 1000 }
+            ],
+            notes: "Pickup by appointment only.",
+            documents: [
+                { name: "pickup_ref_54321.pdf", url: "#" }
+            ],
+            awardedRate: 1100.00
+        };
+
+        let isLoadAwarded = false;
+
+        document.addEventListener('DOMContentLoaded', () => {
+            const urlParams = new URLSearchParams(window.location.search);
+            // Check if the URL contains the 'awarded=true' parameter
+            if (urlParams.get('awarded') === 'true') {
+                isLoadAwarded = true;
+            }
+
+            renderShipmentDetails(MOCK_SHIPMENT);
+        });
+
+        function renderShipmentDetails(shipment) {
+            const app = document.getElementById('app');
+            app.innerHTML = `
+                <div class="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
+                    <h1 class="text-3xl font-bold text-gray-800">Load #${shipment.loadId}: Detailed Shipment Information</h1>
+
+                    <!-- Top Banner (Visible only if Awarded) -->
+                    ${isLoadAwarded ? `
+                        <div class="flex justify-between items-center confirmed-box p-4 rounded-lg">
+                            <p class="text-xl font-semibold text-primary-green">
+                                You won this bid! Rate: $${shipment.awardedRate.toLocaleString()}
+                            </p>
+                            <div class="flex space-x-3">
+                                <button class="px-4 py-2 text-sm font-semibold text-primary-red bg-white border border-primary-red rounded-full hover:bg-red-50" onclick="handleAction('Cancel Shipment')">
+                                    Cancel Shipment
+                                </button>
+                                <button class="px-4 py-2 text-sm font-semibold text-white bg-primary-green rounded-full hover:bg-green-600" onclick="handleAction('Mark as Delivered')">
+                                    Mark as Delivered
+                                </button>
+                            </div>
+                        </div>
+                    ` : ''}
+
+                    <!-- Live Tracking Link (Visible only if Awarded) -->
+                    ${isLoadAwarded ? `
+                        <div class="info-card p-4 flex justify-between items-center">
+                            <span class="text-lg font-semibold text-gray-700">Live Tracking Link:</span>
+                            <a href="https://cloud.samsara.com/load-details/${shipment.loadId}" target="_blank" class="text-primary-blue hover:underline font-mono text-sm truncate">
+                                https://cloud.samsara.com/load-details/${shipment.loadId}
+                            </a>
+                        </div>
+                    ` : ''}
+
+
+                    <!-- PICKUP AND DELIVERY STOPS -->
+                    <div class="grid md:grid-cols-2 gap-6">
+                        <!-- Pickup Stop -->
+                        <div class="info-card p-6">
+                            <h2 class="section-header">Pickup Stops (${shipment.pickup.stops})</h2>
+                            <div class="space-y-3 text-sm">
+                                <p class="text-gray-700 font-semibold">${shipment.pickup.location}</p>
+                                <p class="text-gray-500">Contact: ${shipment.pickup.contact}</p>
+                                <a href="tel:${shipment.pickup.phone.replace(/-/g, '')}" class="text-primary-blue hover:text-blue-800 hover:underline">${shipment.pickup.phone}</a>
+                            </div>
+                        </div>
+
+                        <!-- Delivery Stop -->
+                        <div class="info-card p-6">
+                            <h2 class="section-header">Delivery Stops (${shipment.delivery.stops})</h2>
+                            <div class="space-y-3 text-sm">
+                                <p class="text-gray-700 font-semibold">${shipment.delivery.location}</p>
+                                <p class="text-gray-500">Contact: ${shipment.delivery.contact}</p>
+                                <a href="tel:${shipment.delivery.phone.replace(/-/g, '')}" class="text-primary-blue hover:text-blue-800 hover:underline">${shipment.delivery.phone}</a>
+                                <p class="text-gray-500">Email: ${shipment.delivery.email}</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SPECIFICATIONS AND SCHEDULING -->
+                    <div class="grid md:grid-cols-3 gap-6">
+                        <!-- Shipment Specs -->
+                        <div class="info-card p-6 col-span-1">
+                            <h2 class="section-header">Shipment Specifications</h2>
+                            <div class="grid grid-cols-2 gap-y-3 text-sm">
+                                <p class="font-semibold detail-item">Equipment</p>
+                                <p class="text-right detail-item">${shipment.specs.equipment}</p>
+
+                                <p class="font-semibold detail-item">Total Weight</p>
+                                <p class="text-right detail-item">${shipment.specs.totalWeight}</p>
+
+                                <p class="font-semibold detail-item">Total Skid Quantity</p>
+                                <p class="text-right font-bold text-lg detail-item">${shipment.specs.totalSkidQuantity}</p>
+
+                                <p class="font-semibold detail-item">Est. Linear Feet</p>
+                                <p class="text-right detail-item">${shipment.specs.estLinearFeet}</p>
+                            </div>
+                        </div>
+
+                        <!-- Scheduling -->
+                        <div class="info-card p-6 col-span-1">
+                            <h2 class="section-header">Scheduling</h2>
+                            <div class="space-y-3 text-sm">
+                                <p class="font-semibold detail-item">Pickup Deadline</p>
+                                <p class="text-primary-red font-bold text-lg detail-item">${shipment.scheduling.pickupDeadline}</p>
+
+                                <p class="font-semibold detail-item">Drop Off Deadline</p>
+                                <p class="text-primary-red font-bold text-lg detail-item">${shipment.scheduling.dropOffDeadline}</p>
+                            </div>
+                        </div>
+
+                        <!-- Attachments -->
+                        <div class="info-card p-6 col-span-1">
+                            <h2 class="section-header">Attachments</h2>
+                            <div class="space-y-4">
+                                <p class="font-semibold text-gray-700">Shipper Documents:</p>
+                                ${shipment.documents.map(doc => `
+                                    <div class="flex items-center justify-between text-sm">
+                                        <span class="truncate pr-2">${doc.name}</span>
+                                        <div class="flex space-x-2">
+                                            <a href="${doc.url}" target="_blank" class="text-primary-blue hover:underline">View</a>
+                                            <a href="${doc.url}" download class="text-primary-blue hover:underline">Download</a>
+                                        </div>
+                                    </div>
+                                `).join('')}
+
+                                <p class="font-semibold text-gray-700 mt-4">Carrier Documents:</p>
+                                <div class="border-2 border-dashed border-gray-300 rounded-lg p-4 text-center cursor-pointer hover:bg-gray-50 transition">
+                                    <p class="text-sm text-gray-500">Click to upload or drag and drop</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- SKID DETAILS -->
+                    <div class="info-card p-6">
+                        <h2 class="section-header">Skid Details</h2>
+                        <table class="w-full text-sm text-left text-gray-700">
+                            <thead class="text-xs text-gray-700 uppercase bg-gray-50">
+                                <tr>
+                                    <th scope="col" class="px-6 py-3">Quantity</th>
+                                    <th scope="col" class="px-6 py-3">Dimensions (L×W×H IN)</th>
+                                    <th scope="col" class="px-6 py-3 text-right">Weight Per Skid (LBS)</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${shipment.skids.map(skid => `
+                                    <tr class="bg-white border-b">
+                                        <td class="px-6 py-4 font-bold">${skid.quantity}</td>
+                                        <td class="px-6 py-4">${skid.dimensions}</td>
+                                        <td class="px-6 py-4 text-right">${skid.weight.toLocaleString()}</td>
+                                    </tr>
+                                `).join('')}
+                            </tbody>
+                        </table>
+                    </div>
+
+                    <!-- SPECIAL NOTES -->
+                    <div class="p-6 rounded-lg ${isLoadAwarded ? 'bg-yellow-50 border border-yellow-300' : 'bg-white border border-gray-200'}">
+                        <h2 class="section-header ${isLoadAwarded ? 'text-yellow-700 border-yellow-700' : 'text-gray-800 border-primary-blue'}">Special Notes</h2>
+                        <p class="text-sm text-gray-700">${shipment.notes}</p>
+                    </div>
+
+                    <!-- BID SUBMISSION BOX (Visible only if NOT Awarded) -->
+                    ${!isLoadAwarded ? `
+                        <div class="bid-box p-6 rounded-lg space-y-4">
+                            <h2 class="text-2xl font-bold text-primary-blue">Submit Your Bid</h2>
+                            <input type="number" id="bid-price" placeholder="$ 1250 (Required)" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-primary-blue focus:border-primary-blue">
+                            <textarea id="bid-notes" rows="2" placeholder="Notes (e.g., Available today, 53' Dry Van)" class="w-full p-3 border border-gray-300 rounded-lg focus:ring-primary-blue focus:border-primary-blue"></textarea>
+                            <button class="w-full py-3 bg-primary-blue text-white font-bold rounded-lg hover:bg-blue-600 transition" onclick="handleAction('Submit Bid')">
+                                Submit Bid
+                            </button>
+                        </div>
+                    ` : ''}
+
+                    <!-- Message Box for Alerts -->
+                    <div id="message-box" class="fixed bottom-4 right-4 z-50"></div>
+
+                </div>
+            `;
+        }
+
+        function handleAction(action) {
+            let message = "";
+            let bgColor = "bg-primary-blue";
+
+            if (action === 'Submit Bid') {
+                const price = document.getElementById('bid-price').value;
+                if (!price) {
+                    message = "Please enter a bid amount.";
+                    bgColor = "bg-primary-red";
+                } else {
+                    message = `Bid of $${parseFloat(price).toLocaleString()} submitted successfully!`;
+                    bgColor = "bg-primary-green";
+                }
+            } else if (action === 'Mark as Delivered') {
+                message = "Shipment marked as Delivered! Awaiting final payment confirmation.";
+                bgColor = "bg-primary-green";
+            } else if (action === 'Cancel Shipment') {
+                message = "The request to Cancel Shipment has been sent to the shipper.";
+                bgColor = "bg-primary-red";
+            }
+
+            showMessage(message, bgColor);
+        }
+
+        function showMessage(text, color) {
+            const box = document.getElementById('message-box');
+            const messageEl = document.createElement('div');
+            messageEl.className = `p-4 rounded-lg shadow-xl text-white ${color} mb-2 transition-opacity duration-300 ease-out opacity-0`;
+            messageEl.innerText = text;
+
+            box.prepend(messageEl);
+
+            // Animate in
+            setTimeout(() => messageEl.classList.remove('opacity-0'), 10);
+
+            // Animate out and remove
+            setTimeout(() => {
+                messageEl.classList.add('opacity-0');
+                setTimeout(() => messageEl.remove(), 500);
+            }, 5000);
+        }
+    </script>
 </head>
 <body>
-<p class="p1"><span class="s1">&lt;script src="https://unpkg.com/react@18/umd/react.development.js"&gt;&lt;/script&gt;</span></p>
-<p class="p1"><span class="s1">&lt;script src="https://unpkg.com/react-dom@18/umd/react-dom.development.js"&gt;&lt;/script&gt;</span></p>
-<p class="p1"><span class="s1">&lt;!-- !-- Babel allows us to run JSX directly in the browser for local testing --&gt;</span></p>
-<p class="p1"><span class="s1">&lt;script src="https://unpkg.com/@babel/standalone/babel.min.js"&gt;&lt;/script&gt;</span></p>
+    <div id="app">
+        <!-- Content will be rendered here by JavaScript -->
+    </div>
 </body>
 </html>
