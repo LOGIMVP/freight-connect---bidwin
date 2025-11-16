@@ -427,7 +427,8 @@
                 docElement.id = doc.id;
                 docElement.className = 'flex items-center justify-between text-sm p-2 rounded-lg bg-white border border-gray-100';
                 
-                // Determine if the download button should be present (only show if NOT a new/unsaved document)
+                // Determine if the download button should be present
+                // Download is ONLY visible if the document has been SAVED (isNew: false)
                 const downloadButton = doc.isNew ? '' : `
                     <button class="flex items-center px-3 py-1 text-xs text-white bg-gray-600 rounded-full hover:bg-gray-700 transition duration-150 shadow-sm font-semibold" onclick="showMessage('Downloading document: ${doc.name}')">
                         Download
@@ -503,7 +504,7 @@
                     id: 'new-' + Date.now() + '-' + i,
                     name: file.name,
                     url: '#',
-                    isNew: true // Flag remains internally for logic, but is not displayed
+                    isNew: true // Flag remains internally for logic
                 });
                 uploadedCount++;
             }
@@ -540,7 +541,8 @@
 
             // Set button style and text based on action
             if (actionType === 'cancel') {
-                confirmButton.innerText = 'Confirm Cancellation'; // Changed text here
+                // CONFIRM CANCELLATION BUTTON TEXT RETAINED
+                confirmButton.innerText = 'Confirm Cancellation'; 
                 confirmButton.classList.remove('bg-green-500', 'hover:bg-green-600');
                 confirmButton.classList.add('bg-red-500', 'hover:bg-red-600');
             } else if (actionType === 'delivered') {
