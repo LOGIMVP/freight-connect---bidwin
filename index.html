@@ -1,5 +1,5 @@
 import { useState, useCallback, useMemo } from 'react';
-import { Truck, MapPin, Calendar, Scale, Ruler, FileText, Upload, Trash2, Save, X } from 'lucide-react';
+import { Truck, MapPin, Calendar, Scale, Ruler, FileText, Upload, Trash2, Save, X, RotateCcw } from 'lucide-react';
 
 // Mock Data Interfaces (Should ideally be imported from types.ts)
 interface Document {
@@ -7,6 +7,8 @@ interface Document {
   name: string;
   url: string;
   type: 'shipper' | 'carrier';
+  // State to track local deletion before saving
+  isDeleted?: boolean; 
 }
 
 interface Shipment {
@@ -33,64 +35,103 @@ const MOCK_SHIPMENT: Shipment = {
   skids: [{ quantity: 9, dimensions: "40 x 40 x 40", weight: 1000 }],
   shipperDocuments: [
     { id: 'S-1', name: "Bill_of_Lading_123.pdf", url: "#", type: 'shipper' },
-    { id: 'S-2', name: "Pickup_Ref_54321.pdf", url: "#", type: 'shipper' },
+    { id: 'S-2', name: "Pickup_Ref_54321.pdf", url: "#", type: 'shipper' }, 
   ],
   awardedRate: 1100.00,
   notes: "Pickup by appointment only. Driver must check in 30 mins prior to arrival.",
 };
 
 // --- Component Helper: DocumentRow ---
-const DocumentRow: React.FC<{ doc: Document; onRemove?: (id: string) => void }> = ({ doc, onRemove }) => (
-  <div className="flex items-center justify-between text-sm ml-7 p-2 bg-gray-50 rounded-lg">
-    <div className="flex items-center space-x-2 w-2/3 truncate">
-        <FileText className="w-4 h-4 text-primary-blue flex-shrink-0" />
-        <span className="truncate pr-2 font-medium text-gray-700">{doc.name}</span>
-    </div>
-    <div className="flex space-x-2">
-        {/* View Button */}
-        <a href={doc.url} target="_blank" rel="noopener noreferrer" className="px-3 py-1 text-xs text-primary-blue border border-primary-blue rounded-full hover:bg-blue-50 transition duration-150">
-            View
-        </a>
-        
-        {/* Remove Button (Only for Carrier Documents) */}
-        {doc.type === 'carrier' && onRemove && (
-            <button
-                className="flex items-center px-3 py-1 text-xs text-white bg-primary-red rounded-full hover:bg-red-600 transition duration-150 shadow-sm"
-                onClick={() => onRemove(doc.id)}
-            >
-                <Trash2 className="w-3 h-3 mr-1" />
-                Remove
-            </button>
-        )}
-    </div>
-  </div>
-);
+const DocumentRow: React.FC<{ 
+    doc: Document; 
+    onStageRemove?: (id: string) => void; // Stage removal (set isDeleted=true)
+    onUndoRemove?: (id: string) => void; // Undo removal (set isDeleted=false)
+}> = ({ doc, onStageRemove, onUndoRemove }) => {
+    
+    const isCarrierDoc = doc.type === 'carrier';
+
+    // Conditional styling for pending removal
+    const rowClasses = doc.isDeleted 
+        ? "bg-red-100 border-l-4 border-primary-red opacity-60 transition duration-300"
+        : "bg-gray-50 hover:bg-gray-100 transition duration-150";
+
+    return (
+        <div className={`flex items-center justify-between text-sm ml-7 p-2 rounded-lg ${rowClasses}`}>
+            
+            {/* Document Name and Icon */}
+            <div className="flex items-center space-x-2 w-2/3 truncate">
+                <FileText className="w-4 h-4 text-primary-blue flex-shrink-0" />
+                <span 
+                    className={`truncate pr-2 font-medium text-gray-700 ${doc.isDeleted ? 'line-through text-gray-500 italic' : ''}`}
+                >
+                    {doc.name}
+                    {doc.isDeleted && <span className="text-primary-red ml-2 text-xs font-bold">(Pending Removal)</span>}
+                </span>
+            </div>
+            
+            {/* Actions */}
+            <div className="flex space-x-2 flex-shrink-0">
+                
+                {/* View Button (Always visible) */}
+                <a 
+                    href={doc.url} 
+                    target="_blank" 
+                    rel="noopener noreferrer" 
+                    className="px-3 py-1 text-xs text-primary-blue border border-primary-blue rounded-full hover:bg-blue-50 transition duration-150"
+                >
+                    View
+                </a>
+                
+                {/* Conditional Action Button (Remove or Undo) - Only for Carrier Documents */}
+                {isCarrierDoc && onStageRemove && onUndoRemove && (
+                    doc.isDeleted ? (
+                        // UNDO Button
+                        <button
+                            className="flex items-center px-3 py-1 text-xs text-white bg-primary-green rounded-full hover:bg-green-600 transition duration-150 shadow-sm"
+                            onClick={() => onUndoRemove(doc.id)}
+                        >
+                            <RotateCcw className="w-3 h-3 mr-1" />
+                            Undo
+                        </button>
+                    ) : (
+                        // REMOVE Button
+                        <button
+                            className="flex items-center px-3 py-1 text-xs text-white bg-primary-red rounded-full hover:bg-red-600 transition duration-150 shadow-sm"
+                            onClick={() => onStageRemove(doc.id)}
+                        >
+                            <Trash2 className="w-3 h-3 mr-1" />
+                            Remove
+                        </button>
+                    )
+                )}
+            </div>
+        </div>
+    );
+};
 
 
 // --- Main Component ---
 const CarrierDetailView: React.FC = () => {
   const [trackingLink, setTrackingLink] = useState(MOCK_SHIPMENT.trackingLink);
-  // Separate state for documents the carrier has added (or modified/removed locally)
+  // Documents added or marked for deletion by the carrier
   const [carrierDocuments, setCarrierDocuments] = useState<Document[]>([]);
-  // Store the initial tracking link value to check for changes
-  const initialTrackingLink = MOCK_SHIPMENT.trackingLink;
   
-  // Custom message state for toast notifications
+  const initialTrackingLink = MOCK_SHIPMENT.trackingLink;
   const [message, setMessage] = useState<{ text: string; color: string } | null>(null);
 
-  // Function to show a temporary message (Toast)
   const showMessage = useCallback((text: string, color: string) => {
     setMessage({ text, color });
-    setTimeout(() => setMessage(null), 5000); // Clear after 5 seconds
+    setTimeout(() => setMessage(null), 5000); 
   }, []);
 
-  // Use useMemo to check if there are any pending changes
   const hasUnsavedChanges = useMemo(() => {
     const linkChanged = trackingLink !== initialTrackingLink;
-    const documentsAddedOrRemoved = carrierDocuments.length > 0; // Simple check for pending docs
-    // In a real app, you'd check for new, deleted, and modified docs against a "saved" list
-    return linkChanged || documentsAddedOrRemoved;
-  }, [trackingLink, initialTrackingLink, carrierDocuments.length]);
+    
+    // Check if there are any documents marked for deletion OR any new documents added
+    const documentsChanged = carrierDocuments.some(doc => doc.isDeleted || doc.id.startsWith('carrier-doc-'));
+    
+    return linkChanged || documentsChanged;
+  }, [trackingLink, initialTrackingLink, carrierDocuments]);
 
   // --- HANDLERS ---
 
@@ -108,56 +149,67 @@ const CarrierDetailView: React.FC = () => {
 
       showMessage(`Uploading file: ${file.name} (simulated)...`, "bg-primary-blue");
 
-      // Simulate a successful upload after a short delay
       setTimeout(() => {
         const newDoc: Document = {
-          id: `carrier-doc-${Date.now()}-${Math.floor(Math.random() * 1000)}`,
+          id: `carrier-doc-${Date.now()}-${Math.floor(Math.random() * 1000)}`, 
           name: file.name,
-          url: '#', // Placeholder URL
+          url: '#', 
           type: 'carrier',
         };
         
-        // --- KEY FIX: Update the state with the new document ---
         setCarrierDocuments(prevDocs => [...prevDocs, newDoc]);
         
-        // Clear the file input for re-uploading the same file
         e.target.value = ''; 
         
-        showMessage(`Document added. Click 'Update Changes' to save.`, "bg-accent-yellow text-gray-800");
+        showMessage(`Document added. Ready to save.`, "bg-accent-yellow text-gray-800");
 
       }, 1500);
     }
   }, [showMessage]);
 
-  // --- ATTACHMENT REMOVAL FIX IS HERE ---
-  const handleRemoveAttachment = useCallback((docId: string) => {
-    // This is the CRITICAL STEP: Filter the documents list and update the state.
+  // --- UX IMPROVEMENT: Stage Removal ---
+  const handleStageRemove = useCallback((docId: string) => {
     setCarrierDocuments(prevDocs => {
-        const updatedDocs = prevDocs.filter(doc => doc.id !== docId);
+        const updatedDocs = prevDocs.map(doc => {
+            if (doc.id === docId) {
+                // Mark for deletion
+                return { ...doc, isDeleted: true };
+            }
+            return doc;
+        });
         return updatedDocs;
     });
 
-    showMessage(`Document removed locally. Click 'Update Changes' to finalize.`, "bg-accent-yellow text-gray-800");
+    showMessage(`Document marked for removal. Click 'Undo' to revert or 'Update Changes' to finalize.`, "bg-accent-yellow text-gray-800");
   }, [showMessage]);
-  // --- END OF ATTACHMENT REMOVAL FIX ---
+  
+  // --- UX IMPROVEMENT: Undo Removal ---
+  const handleUndoRemove = useCallback((docId: string) => {
+    setCarrierDocuments(prevDocs => {
+        const updatedDocs = prevDocs.map(doc => {
+            if (doc.id === docId) {
+                // Unmark for deletion
+                return { ...doc, isDeleted: false };
+            }
+            return doc;
+        });
+        return updatedDocs;
+    });
+
+    showMessage(`Removal successfully undone.`, "bg-primary-green");
+  }, [showMessage]);
+  // --- END OF UX IMPROVEMENT ---
 
   const handleSaveChanges = useCallback(() => {
-    // 1. Send trackingLink update to the API
-    // 2. Send carrierDocuments list (additions/deletions) to the API
-    
     showMessage("Saving all updates to tracking link and documents...", "bg-update-purple");
 
     // Simulate save success
     setTimeout(() => {
-        // In a real app, the server would return the new list of saved documents.
-        // For this mock, we assume success and clear the temporary state:
-        // A complete save would involve integrating these documents into the main shipment state
-        // and resetting the trackingLink state back to the 'initial' value.
-        // For simplicity, we just show a success message:
+        // Filter out deleted documents and reset state flags
+        const savedDocs = carrierDocuments.filter(doc => !doc.isDeleted);
         
-        // This is where you would update MOCK_SHIPMENT.trackingLink = trackingLink
-        // And MOCK_SHIPMENT.carrierDocuments = savedDocuments
-
+        setCarrierDocuments(savedDocs.map(doc => ({ ...doc, isDeleted: undefined })));
+        
         showMessage("Shipment details updated successfully.", "bg-primary-green");
     }, 1500);
   }, [trackingLink, carrierDocuments, showMessage]);
@@ -177,12 +229,6 @@ const CarrierDetailView: React.FC = () => {
     </div>
   );
   
-  // Combine all documents for display
-  const allDocuments = useMemo(() => [
-      ...MOCK_SHIPMENT.shipperDocuments,
-      ...carrierDocuments,
-  ], [carrierDocuments]);
-
 
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
@@ -317,7 +363,7 @@ const CarrierDetailView: React.FC = () => {
             {/* Attachments */}
             <DetailCard title="Attachments">
                 <div className="space-y-4">
-                    {/* Shipper Documents */}
+                    {/* Shipper Documents (always displayed) */}
                     <p className="font-bold text-gray-700">Shipper Documents:</p>
                     <div className="space-y-2">
                         {MOCK_SHIPMENT.shipperDocuments.map(doc => (
@@ -329,8 +375,12 @@ const CarrierDetailView: React.FC = () => {
                     <p className="font-bold text-gray-700 pt-4">Your Documents:</p>
                     <div className="space-y-2" id="carrier-document-list">
                         {carrierDocuments.map(doc => (
-                            // Only carrier docs get the onRemove prop
-                            <DocumentRow key={doc.id} doc={doc} onRemove={handleRemoveAttachment} />
+                            <DocumentRow 
+                                key={doc.id} 
+                                doc={doc} 
+                                onStageRemove={handleStageRemove} 
+                                onUndoRemove={handleUndoRemove}
+                            />
                         ))}
                     </div>
 
@@ -340,7 +390,6 @@ const CarrierDetailView: React.FC = () => {
                         id="carrier-file-upload" 
                         className="hidden" 
                         onChange={handleFileUpload}
-                        // Added accept attribute for better UX
                         accept=".pdf,.doc,.docx,.jpg,.jpeg,.png"
                     />
                     <div 
