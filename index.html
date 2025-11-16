@@ -1,4 +1,4 @@
-<!DOCTYPE html>
+       <!DOCTYPE html>
 <html lang="en">
 <head>
     <meta charset="UTF-8">
@@ -89,9 +89,9 @@
             skids: [
                 { quantity: 9, dimensions: "40 x 40 x 40", weight: 1000 }
             ],
-            notes: "Pickup by appointment only.",
+            // Updated document structure to include mock view/download URLs
             documents: [
-                { name: "pickup_ref_54321.pdf", url: "#" }
+                { name: "pickup_ref_54321.pdf", viewUrl: "#view", downloadUrl: "#download" }
             ],
             awardedRate: 1100.00
         };
@@ -225,8 +225,9 @@
                                         <div class="flex items-center justify-between text-sm ml-7">
                                             <span class="truncate pr-2 text-gray-600">${doc.name}</span>
                                             <div class="flex space-x-2">
-                                                <button class="px-3 py-1 text-xs text-text-blue border border-text-blue rounded-full hover:bg-blue-50 transition" onclick="handleAction('View Document')">View</button>
-                                                <button class="px-3 py-1 text-xs text-white bg-text-blue rounded-full hover:bg-blue-600 transition" onclick="handleAction('Download Document')">Download</button>
+                                                <!-- Fixed buttons to call handleAction with specific document context -->
+                                                <button class="px-3 py-1 text-xs text-text-blue border border-text-blue rounded-full hover:bg-blue-50 transition" onclick="handleDocumentAction('View', '${doc.name}')">View</button>
+                                                <button class="px-3 py-1 text-xs text-white bg-text-blue rounded-full hover:bg-blue-600 transition" onclick="handleDocumentAction('Download', '${doc.name}')">Download</button>
                                             </div>
                                         </div>
                                     `).join('')}
@@ -335,8 +336,9 @@
                             <div class="flex items-center justify-between text-sm ml-7 mt-2">
                                 <span class="truncate pr-2 text-gray-600">${file.name}</span>
                                 <div class="flex space-x-2">
-                                    <button class="px-3 py-1 text-xs text-text-blue border border-text-blue rounded-full hover:bg-blue-50 transition" onclick="handleAction('View Document')">View</button>
-                                    <button class="px-3 py-1 text-xs text-white bg-text-blue rounded-full hover:bg-blue-600 transition" onclick="handleAction('Download Document')">Download</button>
+                                    <!-- New uploaded documents are also clickable -->
+                                    <button class="px-3 py-1 text-xs text-text-blue border border-text-blue rounded-full hover:bg-blue-50 transition" onclick="handleDocumentAction('View', '${file.name}')">View</button>
+                                    <button class="px-3 py-1 text-xs text-white bg-text-blue rounded-full hover:bg-blue-600 transition" onclick="handleDocumentAction('Download', '${file.name}')">Download</button>
                                 </div>
                             </div>
                         `;
@@ -431,25 +433,27 @@
 
         function handleAction(action) {
             if (action === 'Mark as Delivered') {
-                // Updated message for Delivery
-                const message = `Are you sure you want to mark this shipment as <strong>Delivered</strong>? This action will initiate the payment process.`;
+                // Updated message: concise
+                const message = `Are you sure you want to mark this shipment as <strong>Delivered</strong>?`;
                 openModal(action, 'Confirm Delivery', message);
             } else if (action === 'Cancel Shipment') {
-                // Updated message for Cancellation
-                const message = `Are you sure you want to <strong>cancel this shipment</strong>? This may result in penalties.`;
+                // Updated message: concise
+                const message = `Are you sure you want to <strong>cancel this shipment</strong>?`;
                 openModal(action, 'Confirm Cancellation', message);
-            } else {
-                // Document actions (no confirmation modal needed)
-                let message = "";
-                let bgColor = "bg-primary-blue";
-
-                if (action === 'View Document') {
-                    message = "Viewing document...";
-                } else if (action === 'Download Document') {
-                    message = "Downloading document...";
-                }
-                showMessage(message, bgColor);
             }
+            // Note: Document actions are handled by handleDocumentAction below
+        }
+
+        function handleDocumentAction(actionType, fileName) {
+            let message = "";
+            let bgColor = "bg-primary-blue";
+
+            if (actionType === 'View') {
+                message = `Simulating view for document: ${fileName}...`;
+            } else if (actionType === 'Download') {
+                message = `Simulating download for document: ${fileName}...`;
+            }
+            showMessage(message, bgColor);
         }
 
         function saveTrackingLink(link) {
