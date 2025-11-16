@@ -275,17 +275,20 @@
                                 <table class="w-full text-sm text-left text-gray-700">
                                     <thead class="text-xs text-gray-600 uppercase bg-gray-50">
                                         <tr>
-                                            <th scope="col" class="py-3 pl-3">Quantity</th>
-                                            <th scope="col" class="py-3">Dimensions (L×W×H IN)</th>
+                                            <!-- Aligned Quantity header to left (default) to match data -->
+                                            <th scope="col" class="py-3 pl-3 text-left">Quantity</th>
+                                            <!-- Added text-center class to center the Dimensions header -->
+                                            <th scope="col" class="py-3 text-center">Dimensions (L×W×H IN)</th>
+                                            <!-- Kept Weight header aligned to right to match data -->
                                             <th scope="col" class="py-3 pr-3 text-right">Weight Per Skid (LBS)</th>
                                         </tr>
                                     </thead>
                                     <tbody>
                                         ${shipment.skids.map(skid => `
                                             <tr class="bg-white border-b last:border-b-0">
-                                                <!-- Added font-semibold to all data fields for consistency -->
-                                                <td class="py-4 pl-3 font-semibold text-gray-800">${skid.quantity}</td>
-                                                <td class="py-4 font-semibold text-gray-800">${skid.dimensions}</td>
+                                                <!-- Data fields kept consistent with font-semibold and aligned to match headers -->
+                                                <td class="py-4 pl-3 font-semibold text-gray-800 text-left">${skid.quantity}</td>
+                                                <td class="py-4 font-semibold text-gray-800 text-center">${skid.dimensions}</td>
                                                 <td class="py-4 pr-3 text-right font-semibold text-gray-800">${skid.weight.toLocaleString()}</td>
                                             </tr>
                                         `).join('')}
