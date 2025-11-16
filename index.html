@@ -280,7 +280,7 @@
             </div>
         </div>
         
-        <!-- Custom Confirmation Modal -->
+        <!-- Custom Confirmation Modal (FIXED AND CENTERED) -->
         <div id="confirmation-modal" class="fixed inset-0 z-50 hidden bg-gray-900 bg-opacity-75 flex items-center justify-center p-4 transition-opacity duration-300" aria-modal="true" role="dialog">
             <div class="bg-white rounded-xl shadow-2xl w-full max-w-sm p-6 transform transition-all duration-300 scale-95 opacity-0" id="modal-content">
                 <h3 id="modal-title" class="text-xl font-bold text-gray-900 mb-4"></h3>
@@ -339,6 +339,7 @@
 
             // Show the modal with transition effects
             modal.classList.remove('hidden');
+            // Give the browser a moment to apply 'display: flex' before applying transitions
             setTimeout(() => {
                 modalContent.classList.remove('scale-95', 'opacity-0');
                 modalContent.classList.add('scale-100', 'opacity-100');
@@ -367,15 +368,36 @@
          */
         function executeAction() {
             hideModal();
+            // We'll use a temporary message box instead of alert()
+            const messageBox = document.getElementById('message-box');
+            
             if (currentAction === 'cancel') {
-                // In a real application, you would make an API call here.
-                alert('Shipment L-4839 has been cancelled (simulated).');
+                showMessage('Shipment L-4839 has been CANCELLED (simulated).');
             } else if (currentAction === 'delivered') {
-                // In a real application, you would make an API call here.
-                alert('Shipment L-4839 has been marked as delivered (simulated). Payment process initiated.');
+                showMessage('Shipment L-4839 marked DELIVERED (simulated). Payment initiated.');
             }
             currentAction = ''; // Reset action
         }
+
+        /**
+         * Shows a temporary, custom message box (instead of alert()).
+         * Note: Added message-box HTML element below the modal structure.
+         */
+        function showMessage(msg) {
+            const messageBox = document.getElementById('message-box');
+            messageBox.innerText = msg;
+            messageBox.classList.remove('hidden');
+            
+            // Auto-hide the message after 4 seconds
+            setTimeout(() => {
+                messageBox.classList.add('hidden');
+            }, 4000);
+        }
     </script>
+
+    <!-- Message Box (Used instead of alert()) -->
+    <div id="message-box" class="fixed bottom-4 right-4 z-50 p-4 rounded-xl shadow-xl text-gray-800 bg-blue-300/90 font-medium text-sm transition-all duration-300 hidden">
+        Action executed successfully.
+    </div>
 </body>
 </html>
