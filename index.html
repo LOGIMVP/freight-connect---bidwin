@@ -192,7 +192,9 @@
                         <!-- Shipper Documents Section (Static/Non-Editable for Carrier) -->
                         <div>
                             <p class="text-base font-semibold text-gray-700 mb-2">Shipper Documents:</p>
-                            <div class="flex items-center justify-between text-sm p-2 rounded-lg bg-white">
+                            
+                            <!-- RESTORED STATIC SHIPPER DOCUMENT -->
+                            <div class="flex items-center justify-between text-sm p-2 rounded-lg bg-white border border-gray-100">
                                 <div class="flex items-center space-x-2 w-2/3 truncate">
                                     <!-- Simple File Icon SVG -->
                                     <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="w-4 h-4 text-gray-500 flex-shrink-0"><path d="M14.5 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V7.5L14.5 2z"/><polyline points="14 2 14 8 20 8"/></svg>
@@ -213,9 +215,9 @@
                         <div>
                             <p class="text-base font-semibold text-gray-700 mb-2 mt-4">Carrier Documents:</p>
                             
-                            <!-- Documents will be rendered here by JavaScript -->
+                            <!-- Documents will be rendered here by JavaScript (starts empty) -->
                             <div id="carrier-documents-list" class="space-y-2">
-                                <!-- Dynamic content inserted by renderCarrierDocuments() -->
+                                <!-- Dynamic content inserted by renderCarrierDocuments(), starts empty in JS -->
                             </div>
                             <!-- END carrier-documents-list -->
 
@@ -328,7 +330,7 @@
         let isModified = false;
 
         // --- Simulated Initial Data State ---
-        // *** MODIFIED: carrierDocuments is now an empty array for a clean start. ***
+        // Carrier Documents is an empty array for a clean start.
         const initialShipmentData = {
             trackingLink: document.getElementById('tracking-link').value,
             carrierDocuments: [] 
